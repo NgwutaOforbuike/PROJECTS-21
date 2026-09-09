@@ -1,0 +1,5 @@
+checked_at=2026-09-09T23:52:06Z
+url=https://global-wealth-trading-os-oforbuikengwuta-5194.vercel.app/api/auth/session
+http_code=302
+body=Redirecting...
+configured_ok=false
