@@ -1,0 +1,53 @@
+name: Global Wealth OS Security
+
+on:
+  push:
+    branches: [global-wealth-trading-os]
+  pull_request:
+    branches: [global-wealth-trading-os]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-and-dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject obvious committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! git grep -nE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|sk-[A-Za-z0-9_-]{20,}|api[_-]?key[[:space:]]*=[[:space:]]*["'"'][^$][^"'"']{8,}|password[[:space:]]*=[[:space:]]*["'"'][^$][^"'"']{8,})' -- ':!*.example' ':!*.md'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Audit API dependencies
+        working-directory: global-wealth-trading-os
+        run: |
+          npm install
+          npm audit --audit-level=high
+
+      - name: Audit Web dependencies
+        working-directory: global-wealth-trading-os/web
+        run: |
+          npm install
+          npm audit --audit-level=high
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Audit Python dependencies
+        working-directory: global-wealth-trading-os/python_ai
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pip-audit
+          pip-audit
