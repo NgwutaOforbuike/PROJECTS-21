@@ -12,52 +12,84 @@ permissions:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Prepare workspace
         run: |
-          mkdir -p sec_raw sec_selected
-      - name: Download official SEC submissions archive
+          mkdir -p hf_repo sec_all sec_selected artifacts
+
+      - name: Install Hugging Face client
         run: |
-          curl -fL --retry 5 --retry-delay 5             -A "GlobalWealthAI Research https://github.com/NgwutaOforbuike/PROJECTS-21"             https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip             -o submissions.zip
-          test -s submissions.zip
-      - name: Extract archive
+          python -m pip install --quiet --disable-pip-version-check huggingface_hub
+
+      - name: Download SEC-derived full 10-K archives
         run: |
-          unzip -q submissions.zip -d sec_raw
-      - name: Select 10000 genuine source records
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id="astr010/sec-10k-markdown-compressed",
+              repo_type="dataset",
+              local_dir="hf_repo",
+              allow_patterns=["*_filings.tar.gz"],
+          )
+          PY
+
+      - name: Extract all filing archives
         shell: bash
         run: |
-          find sec_raw -type f -name '*.json' -printf '%s %p\n'             | sort -n             | head -n 10000             | cut -d' ' -f2- > selected_files.txt
+          find hf_repo -type f -name '*_filings.tar.gz' -print0 | while IFS= read -r -d '' a; do
+            tar -xzf "$a" -C sec_all
+          done
+          TOTAL=$(find sec_all -type f -name '10-K_*.md' | wc -l)
+          echo "Full filings available: $TOTAL"
+          test "$TOTAL" -ge 10000
+
+      - name: Select 10000 complete filings
+        shell: bash
+        run: |
+          find sec_all -type f -name '10-K_*.md' -printf '%s %p\n'             | sort -n             | head -n 10000             | cut -d' ' -f2- > selected_files.txt
 
           COUNT=$(wc -l < selected_files.txt)
-          echo "Selected $COUNT files"
-          test "$COUNT" -ge 10000
+          echo "Selected complete filings: $COUNT"
+          test "$COUNT" -eq 10000
 
           while IFS= read -r f; do
-            cp --parents "$f" sec_selected/
+            rel="${f#sec_all/}"
+            mkdir -p "sec_selected/$(dirname "$rel")"
+            cp "$f" "sec_selected/$rel"
           done < selected_files.txt
-      - name: Build integrity manifest
+
+      - name: Build acquisition and integrity manifests
         shell: bash
         run: |
           cd sec_selected
-          find . -type f -name '*.json' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
-          COUNT=$(find . -type f -name '*.json' | wc -l)
+          find . -type f -name '10-K_*.md' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          COUNT=$(find . -type f -name '10-K_*.md' | wc -l)
           {
-            echo "source=U.S. Securities and Exchange Commission EDGAR"
-            echo "source_url=https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip"
-            echo "acquired_json_documents=$COUNT"
+            echo "source_dataset=astr010/sec-10k-markdown-compressed"
+            echo "source_dataset_url=https://huggingface.co/datasets/astr010/sec-10k-markdown-compressed"
+            echo "underlying_source=U.S. Securities and Exchange Commission EDGAR"
+            echo "document_type=SEC Form 10-K full-length Markdown"
+            echo "acquired_documents=$COUNT"
+            echo "selection=10000 smallest complete filings by byte size from 12361-document corpus"
             echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "selection=10000 smallest JSON records by byte size from current official submissions archive"
+            echo "dataset_license=MIT"
+            echo "underlying_SEC_filings=US Government public records"
           } > ACQUISITION_MANIFEST.txt
-          test "$COUNT" -ge 10000
-      - name: Package corpus
+          test "$COUNT" -eq 10000
+
+      - name: Package verified corpus
         run: |
-          tar -czf sec_edgar_10000_source_documents.tar.gz -C sec_selected .
-          ls -lh sec_edgar_10000_source_documents.tar.gz
-      - name: Upload corpus artifact
+          tar -czf artifacts/sec_edgar_10000_full_10k_documents.tar.gz -C sec_selected .
+          ls -lh artifacts/sec_edgar_10000_full_10k_documents.tar.gz
+          sha256sum artifacts/sec_edgar_10000_full_10k_documents.tar.gz > artifacts/PACKAGE_SHA256.txt
+
+      - name: Upload verified corpus artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sec-edgar-10000-source-documents
-          path: sec_edgar_10000_source_documents.tar.gz
+          name: sec-edgar-10000-full-10k-documents
+          path: |
+            artifacts/sec_edgar_10000_full_10k_documents.tar.gz
+            artifacts/PACKAGE_SHA256.txt
           retention-days: 1
           compression-level: 0
