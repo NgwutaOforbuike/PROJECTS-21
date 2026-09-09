@@ -12,6 +12,10 @@ from .daily_cycle import DailyInvestmentCycle
 from .monte_carlo import simulate as monte_carlo_simulate
 from .research_score import score_evidence
 from .audit import AuditLedger
+from .drift import detect_drift
+from .transaction_costs import estimate_costs
+from .alerts import AlertEngine
+from .database import init_db
 
 app = FastAPI(title="Global Wealth AI", version="0.1.0")
 kb = KnowledgeBase()
@@ -246,6 +250,11 @@ async def system_capabilities() -> dict:
         "prediction_outcomes": "ACTIVE",
         "strategy_promotion_gate": "ACTIVE",
         "audit_ledger": "ACTIVE",
+        "model_drift_detection": "ACTIVE",
+        "transaction_cost_model": "ACTIVE",
+        "portfolio_reconciliation": "ACTIVE",
+        "operational_alerts": "ACTIVE",
+        "sql_persistence": "ACTIVE",
         "live_execution": "LOCKED",
     }
 
@@ -325,3 +334,64 @@ async def ingest_official_web(req: OfficialWebIngestRequest) -> dict:
     )
     audit.append("INGEST_OFFICIAL_WEB","research-pipeline",{"url":req.url,"sha256":result.payload["sha256"]})
     return {"report":report.__dict__,"sha256":result.payload["sha256"],"url":result.metadata.get("url")}
+
+
+class DriftRequest(BaseModel):
+    reference: list[float]
+    recent: list[float]
+
+
+class CostRequest(BaseModel):
+    notional: float
+    spread_bps: float
+    market_impact_bps: float
+    commission: float = 0.0
+    fx_bps: float = 0.0
+
+
+class AlertRequest(BaseModel):
+    drawdown_pct: float
+    data_confidence: float
+    stale: bool
+    drifted: bool
+    reconciliation_issues: int = 0
+
+
+@app.post("/ops/drift")
+async def drift(req: DriftRequest) -> dict:
+    return detect_drift(req.reference, req.recent).__dict__
+
+
+@app.post("/ops/transaction-costs")
+async def transaction_costs(req: CostRequest) -> dict:
+    try:
+        return estimate_costs(
+            req.notional,
+            spread_bps=req.spread_bps,
+            market_impact_bps=req.market_impact_bps,
+            commission=req.commission,
+            fx_bps=req.fx_bps,
+        ).__dict__
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/ops/alerts")
+async def alerts(req: AlertRequest) -> list[dict]:
+    rows = AlertEngine().evaluate(
+        drawdown_pct=req.drawdown_pct,
+        data_confidence=req.data_confidence,
+        stale=req.stale,
+        drifted=req.drifted,
+        reconciliation_issues=req.reconciliation_issues,
+    )
+    return [x.__dict__ for x in rows]
+
+
+@app.post("/ops/database/init")
+async def database_init() -> dict:
+    try:
+        init_db()
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Database initialisation failed: {exc}") from exc
