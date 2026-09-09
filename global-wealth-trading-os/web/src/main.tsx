@@ -40,7 +40,7 @@ function App(){
   </aside>
   <main>
    <header>
-    <div><p className="eyebrow">INSTITUTIONAL COMMAND CENTRE</p><h1>Global portfolio intelligence</h1></div>
+    <div><p className="eyebrow">INSTITUTIONAL COMMAND CENTRE</p><h1>Nigeria · USA · UK portfolio intelligence</h1></div>
     <div className="headerActions"><button className="icon"><Search/></button><button className="icon"><Bell/></button><button className="control"><SlidersHorizontal/> Controls</button><div className="avatar">ON</div></div>
    </header>
 
@@ -54,24 +54,24 @@ function App(){
 
    <section className="heroGrid">
     <div className="panel portfolioHero">
-      <div className="panelHead"><div><span>NET LIQUIDATION VALUE</span><h2>{money(1248670)}</h2></div><span className="status">PAPER PORTFOLIO</span></div>
-      <div className="return"><strong>+{money(186420)}</strong><span>+17.55% since inception</span></div>
+      <div className="panelHead"><div><span>NET LIQUIDATION VALUE</span><h2>{money(150)}</h2></div><span className="status">PAPER PORTFOLIO · $150 START</span></div>
+      <div className="return"><strong>+{money(0)}</strong><span>Starting capital</span></div>
       <div className="equityCurve">
         <svg viewBox="0 0 600 150" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5be7c4" stopOpacity=".32"/><stop offset="100%" stopColor="#5be7c4" stopOpacity="0"/></linearGradient></defs><path d="M0 125 C55 115 70 100 115 106 S180 88 215 91 S270 69 315 74 S365 48 402 53 S460 30 505 37 S555 20 600 17 L600 150 L0 150 Z" fill="url(#g)"/><path d="M0 125 C55 115 70 100 115 106 S180 88 215 91 S270 69 315 74 S365 48 402 53 S460 30 505 37 S555 20 600 17" fill="none" stroke="#5be7c4" strokeWidth="3"/></svg>
       </div>
-      <div className="heroMetrics"><div><span>Today</span><b className="positive">+0.84%</b></div><div><span>YTD</span><b>+14.72%</b></div><div><span>Cash</span><b>$218.4K</b></div><div><span>Gross exposure</span><b>72.5%</b></div></div>
+      <div className="heroMetrics"><div><span>Today</span><b>0.00%</b></div><div><span>YTD</span><b>0.00%</b></div><div><span>Cash</span><b>$150.00</b></div><div><span>Gross exposure</span><b>0.0%</b></div></div>
     </div>
     <div className="panel riskCard">
-      <div className="panelHead"><div><span>RISK GOVERNOR</span><h3>Within mandate</h3></div><ShieldCheck className="shield"/></div>
+      <div className="panelHead"><div><span>RISK GOVERNOR</span><h3>NG · US · UK ONLY</h3></div><ShieldCheck className="shield"/></div>
       <div className="riskRing"><div><b>63</b><span>Risk utilisation</span></div></div>
-      <div className="riskRows"><p><span>Max drawdown</span><b>4.8% / 12%</b></p><p><span>1-day VaR</span><b>1.7%</b></p><p><span>Largest position</span><b>8.6% / 10%</b></p><p><span>Leverage</span><b>OFF</b></p></div>
+      <div className="riskRows"><p><span>Max drawdown</span><b>0.0% / 12%</b></p><p><span>1-day VaR</span><b>1.7%</b></p><p><span>Largest position</span><b>0.0% / 10%</b></p><p><span>Leverage</span><b>OFF</b></p></div>
       <button className="danger">Emergency kill switch</button>
     </div>
    </section>
 
-   <section className="sectionTitle"><div><p className="eyebrow">CAPITAL ALLOCATION ENGINE</p><h2>Global Opportunity Map</h2></div><button className="link">Open full scanner <ChevronRight/></button></section>
+   <section className="sectionTitle"><div><p className="eyebrow">CAPITAL ALLOCATION ENGINE</p><h2>Nigeria · USA · UK Opportunity Map</h2></div><button className="link">Open full scanner <ChevronRight/></button></section>
    <section className="panel tablePanel">
-    <div className="filters"><span className="selected">All assets</span><span>Equities</span><span>Crypto</span><span>FX</span><span>Fixed income</span><span>Commodities</span></div>
+    <div className="filters"><span className="selected">Allowed markets</span><span>Nigeria</span><span>USA</span><span>UK</span><span>Fractional assets</span><span>15% target hurdle</span></div>
     <div className="table">
       <div className="tr th"><span>Asset</span><span>Class / Region</span><span>AI Score</span><span>1D</span><span>Risk</span><span>Committee</span><span>Decision</span></div>
       {opportunities.map(o=><div className="tr" key={o.asset}><span className="asset"><b>{o.asset}</b><small>{o.name}</small></span><span><b>{o.cls}</b><small>{o.region}</small></span><span className="score"><b>{o.score}</b><i style={{width:`${o.score}%`}}></i></span><span className={o.ret>=0?"positive":"negative"}>{pct(o.ret)}</span><span>{o.risk}</span><span>{o.committee}</span><span className={o.decision.includes("BUY")?"pill buy":"pill watch"}>{o.decision}</span></div>)}
@@ -80,10 +80,10 @@ function App(){
 
    <section className="lowerGrid">
     <div className="panel committee">
-      <div className="panelHead"><div><span>AI INVESTMENT COMMITTEE</span><h3>NVDA · Proposal #GW-1842</h3></div><Sparkles/></div>
-      <p className="thesis">Committee consensus: <b>BUY</b>. Expected upside remains attractive, but crowding risk reduces allowable position size.</p>
+      <div className="panelHead"><div><span>AI INVESTMENT COMMITTEE</span><h3>Next qualifying proposal</h3></div><Sparkles/></div>
+      <p className="thesis">No trade is pre-approved. The system must first find an allowed-market candidate whose modelled paper return clears the 15% daily target hurdle and all risk checks.</p>
       <div className="votes">{votes.map(v=><div className="vote" key={v.name}><span>{v.name}</span><b>{v.vote}</b><div><i style={{width:`${v.confidence}%`}}></i></div><small>{v.detail}</small></div>)}</div>
-      <div className="proposal"><div><span>Proposed allocation</span><b>4.25%</b></div><div><span>Entry</span><b>$178.20</b></div><div><span>Stop</span><b>$166.40</b></div><div><span>Target</span><b>$204.60</b></div><button>Review order</button></div>
+      <div className="proposal"><div><span>Starting equity</span><b>$150</b></div><div><span>Target hurdle</span><b>15% / day</b></div><div><span>Markets</span><b>NG · US · UK</b></div><div><span>Execution</span><b>Paper only</b></div><button>Await qualifying setup</button></div>
     </div>
     <div className="panel stress">
       <div className="panelHead"><div><span>STRESS ENGINE</span><h3>Portfolio scenarios</h3></div><Activity/></div>
