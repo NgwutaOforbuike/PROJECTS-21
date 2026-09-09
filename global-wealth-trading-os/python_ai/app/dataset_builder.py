@@ -37,17 +37,24 @@ def _hash_frame(frame:pd.DataFrame)->str:
 def add_forward_return_labels(frame:pd.DataFrame,horizons:tuple[int,...]=(1,5,20))->pd.DataFrame:
     x=frame.copy()
     for h in horizons:
-        x[f"target_return_{h}d"]=x["close"].shift(-h)/x["close"]-1
-        x[f"target_up_{h}d"]=(x[f"target_return_{h}d"]>0).astype(float)
+        ret=x["close"].shift(-h)/x["close"]-1
+        x[f"target_return_{h}d"]=ret
+        up=(ret>0).astype(float)
+        up=up.where(ret.notna())
+        x[f"target_up_{h}d"]=up
     return x
 
 
 def add_hurdle_label(frame:pd.DataFrame,horizon:int=1,hurdle_pct:float=5.0)->pd.DataFrame:
     x=frame.copy()
-    future_high=x["high"].shift(-1).rolling(horizon).max().shift(-(horizon-1)) if horizon>1 else x["high"].shift(-1)
-    x[f"target_hit_{hurdle_pct:g}pct_{horizon}d"]=(
-        future_high/x["close"]-1 >= hurdle_pct/100
-    ).astype(float)
+    future_high=pd.concat(
+        [x["high"].shift(-i) for i in range(1,horizon+1)],
+        axis=1,
+    ).max(axis=1,skipna=False)
+    forward_return=future_high/x["close"]-1
+    hit=(forward_return>=hurdle_pct/100).astype(float)
+    hit=hit.where(forward_return.notna())
+    x[f"target_hit_{hurdle_pct:g}pct_{horizon}d"]=hit
     return x
 
 
