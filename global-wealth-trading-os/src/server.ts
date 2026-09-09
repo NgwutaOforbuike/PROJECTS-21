@@ -12,9 +12,9 @@ await app.register(cors,{origin:true});
 
 const portfolio:Portfolio={
   baseCurrency:"USD",
-  cash:100000,
-  equity:100000,
-  peakEquity:100000,
+  cash:150,
+  equity:150,
+  peakEquity:150,
   positions:[]
 };
 
@@ -25,7 +25,9 @@ const limits:RiskLimits={
   maxPortfolioDrawdownPct:12,
   maxVolatilityPct:45,
   allowLeverage:false,
-  killSwitch:false
+  killSwitch:false,
+  allowedCountries:["Nigeria","United States","United Kingdom"],
+  targetDailyReturnPct:15
 };
 
 const proposals=new Map<string,TradeProposal>();
