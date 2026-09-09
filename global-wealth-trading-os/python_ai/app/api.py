@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 from .knowledge import KnowledgeBase
 from .models import Evidence, Mandate, MarketState, PortfolioState
@@ -16,6 +16,11 @@ from .drift import detect_drift
 from .transaction_costs import estimate_costs
 from .alerts import AlertEngine
 from .database import init_db
+from .training_service import TrainingService
+from .model_artifacts import ModelArtifactStore
+from .model_registry import ModelRegistry
+from .dataset_registry import DatasetRegistry
+from .retraining import should_retrain
 
 app = FastAPI(title="Global Wealth AI", version="0.1.0")
 kb = KnowledgeBase()
@@ -23,6 +28,10 @@ orchestrator = AutonomousInvestmentOrchestrator(Mandate())
 ingestion = ResearchIngestionPipeline(kb=kb)
 daily_cycle_engine = DailyInvestmentCycle(orchestrator=orchestrator, kb=kb)
 audit = AuditLedger()
+training_service = TrainingService()
+model_artifacts = ModelArtifactStore()
+model_registry = ModelRegistry()
+dataset_registry = DatasetRegistry()
 
 
 class DailyBestRequest(BaseModel):
@@ -255,6 +264,12 @@ async def system_capabilities() -> dict:
         "portfolio_reconciliation": "ACTIVE",
         "operational_alerts": "ACTIVE",
         "sql_persistence": "ACTIVE",
+        "dataset_lineage_registry": "ACTIVE",
+        "temporal_leakage_guard": "ACTIVE",
+        "model_training_pipeline": "ACTIVE",
+        "champion_challenger_registry": "ACTIVE",
+        "artifact_hash_verification": "ACTIVE",
+        "retraining_policy": "ACTIVE",
         "live_execution": "LOCKED",
     }
 
@@ -395,3 +410,93 @@ async def database_init() -> dict:
         return {"ok": True}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database initialisation failed: {exc}") from exc
+
+
+class OHLCVPoint(BaseModel):
+    timestamp: str
+    open: float = Field(gt=0)
+    high: float = Field(gt=0)
+    low: float = Field(gt=0)
+    close: float = Field(gt=0)
+    volume: float = Field(ge=0)
+
+
+class TrainModelRequest(BaseModel):
+    instrument_id: str
+    region: str
+    source_ids: list[str]
+    observations: list[OHLCVPoint]
+    target_horizon: int = Field(default=1, ge=1, le=20)
+    strategy_name: str = "daily-return"
+    version: str = "v1"
+
+
+class RetrainingCheckRequest(BaseModel):
+    last_trained_at: str
+    new_clean_observations: int = 0
+    drifted: bool = False
+    mean_shift_z: float = 0.0
+    volatility_ratio: float = 1.0
+
+
+@app.post("/training/train")
+async def train_model(req: TrainModelRequest) -> dict:
+    if req.region not in {"NG","US","UK"}:
+        raise HTTPException(status_code=400, detail="region must be NG, US or UK")
+    if not req.source_ids:
+        raise HTTPException(status_code=400, detail="at least one source_id is required")
+    if len(req.observations) < 140:
+        raise HTTPException(status_code=400, detail="at least 140 OHLCV observations are required for training")
+    try:
+        import pandas as pd
+        rows=[o.model_dump() for o in req.observations]
+        frame=pd.DataFrame(rows)
+        frame["timestamp"]=pd.to_datetime(frame["timestamp"],utc=True,errors="raise")
+        frame=frame.set_index("timestamp").sort_index()
+        result=training_service.train_from_frame(
+            frame[["open","high","low","close","volume"]],
+            instrument_id=req.instrument_id,
+            region=req.region,
+            source_ids=req.source_ids,
+            target_horizon=req.target_horizon,
+            strategy_name=req.strategy_name,
+            version=req.version,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Training failed: {exc}") from exc
+    audit.append(
+        "MODEL_TRAINED","training-service",
+        {"model_id":result.model_id,"dataset_hash":result.dataset_hash,
+         "strategy_name":req.strategy_name,"promoted":result.promoted_to_champion}
+    )
+    return result.__dict__
+
+
+@app.get("/training/models")
+async def list_models() -> list[dict]:
+    return [m.__dict__ for m in model_artifacts.list_metadata()]
+
+
+@app.get("/training/champion/{strategy_name}")
+async def get_champion(strategy_name: str) -> dict:
+    champion=model_registry.champion(strategy_name)
+    if champion is None:
+        raise HTTPException(status_code=404, detail="No champion model registered for strategy.")
+    return champion.__dict__
+
+
+@app.get("/training/datasets")
+async def list_datasets() -> list[dict]:
+    return [d.__dict__ for d in dataset_registry.all()]
+
+
+@app.post("/training/retraining-check")
+async def retraining_check(req: RetrainingCheckRequest) -> dict:
+    from .drift import DriftReport
+    drift=DriftReport(req.drifted,req.mean_shift_z,req.volatility_ratio,["provided drift signal"] if req.drifted else [])
+    decision=should_retrain(
+        last_trained_at=req.last_trained_at,
+        new_clean_observations=req.new_clean_observations,
+        drift=drift,
+    )
+    return decision.__dict__
