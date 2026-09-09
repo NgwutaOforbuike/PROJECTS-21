@@ -1,18 +1,25 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {createRoot} from "react-dom/client";
-import {AlertTriangle,ArrowRight,Globe2,LockKeyhole,RefreshCw,ShieldCheck,Target,WalletCards} from "lucide-react";
+import {AlertTriangle,Globe2,LockKeyhole,RefreshCw,Search,ShieldCheck,Target,WalletCards} from "lucide-react";
 import "./styles.css";
 import {buildInfo} from "./buildInfo";
 
 type Tab="decision"|"opportunities"|"portfolio"|"risk";
 type Json=Record<string,any>;
+type Quote={
+  symbol:string;assetClass:string;region:string;price:number|null;bid:number|null;ask:number|null;
+  changePct:number|null;volume:number|null;currency:string|null;source:string;delayed:boolean;stale:boolean;
+  confidence:number;available:boolean;error?:string;observedAt?:string|null;
+};
 
-function useApi(path:string){
+const ASSET_CLASSES=["ALL","EQUITY","ETF","FX","CRYPTO","COMMODITY","FUTURE","OPTION","BOND","FUND"] as const;
+
+function useApi(path:string,autoMs?:number){
   const [data,setData]=useState<Json|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState<string|null>(null);
   const load=async()=>{
-    setLoading(true); setError(null);
+    setLoading(true);setError(null);
     try{
       const r=await fetch(path,{cache:"no-store"});
       if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -20,22 +27,31 @@ function useApi(path:string){
     }catch(e:any){setError(e?.message||String(e));}
     finally{setLoading(false);}
   };
-  useEffect(()=>{load();},[path]);
+  useEffect(()=>{
+    load();
+    if(!autoMs) return;
+    const id=setInterval(load,autoMs);
+    return()=>clearInterval(id);
+  },[path,autoMs]);
   return {data,loading,error,load};
 }
 
+function formatPrice(v:number|null,currency?:string|null){
+  if(v==null)return "—";
+  const max=v<1?6:v<100?4:2;
+  return `${currency==="USD"?"$":""}${v.toLocaleString(undefined,{maximumFractionDigits:max})}`;
+}
+
 function App(){
-  const [tab,setTab]=useState<Tab>("decision");
+  const [tab,setTab]=useState<Tab>("opportunities");
   const mandate=useApi("/api/mandate");
-  const decision=useApi("/api/decision");
-  const opportunities=useApi("/api/opportunities");
-  const portfolio=useApi("/api/portfolio");
-  const risk=useApi("/api/risk");
+  const decision=useApi("/api/decision",15000);
+  const market=useApi("/api/market/quotes",10000);
+  const providers=useApi("/api/market/providers",30000);
+  const portfolio=useApi("/api/portfolio",15000);
+  const risk=useApi("/api/risk",15000);
 
-  const current=useMemo(()=>({
-    decision,opportunities,portfolio,risk
-  }[tab]),[tab,decision,opportunities,portfolio,risk]);
-
+  const current=useMemo(()=>({decision,opportunities:market,portfolio,risk}[tab]),[tab,decision,market,portfolio,risk]);
   const nav=[
     ["decision","Today's Decision",Target],
     ["opportunities","Opportunities",Globe2],
@@ -62,65 +78,139 @@ function App(){
       </header>
 
       <section className="marketStrip">
-        <span>Equity <b>${mandate.data?.startingEquityUsd?.toFixed?.(2) ?? "150.00"}</b></span>
-        <span>Cash <b>${mandate.data?.cashUsd?.toFixed?.(2) ?? "150.00"}</b></span>
-        <span>Max risk / trade <b>{mandate.data?.maxRiskPerTradePct ?? 0.5}%</b></span>
-        <span>Return hurdle <b>{mandate.data?.minModelledReturnPct ?? 5}%+</b></span>
+        <span>Equity <b>${mandate.data?.startingEquityUsd?.toFixed?.(2)??"150.00"}</b></span>
+        <span>Cash <b>${mandate.data?.cashUsd?.toFixed?.(2)??"150.00"}</b></span>
+        <span>Max risk / trade <b>{mandate.data?.maxRiskPerTradePct??0.5}%</b></span>
+        <span>Return hurdle <b>{mandate.data?.minModelledReturnPct??5}%+</b></span>
         <span>Markets <b>NG · US · UK</b></span>
       </section>
 
-      {current.error && <section className="panel"><div className="danger"><AlertTriangle/>Unable to reach live app service: {current.error}</div></section>}
-      {current.loading && <section className="panel"><p className="thesis">Refreshing live application data…</p></section>}
+      {current.error&&<section className="panel"><div className="danger"><AlertTriangle/>Live application service error: {current.error}</div></section>}
+      {current.loading&&<section className="panel"><p className="thesis">Refreshing live application data…</p></section>}
 
-      {!current.loading && tab==="decision" && <DecisionView data={decision.data}/>}
-      {!current.loading && tab==="opportunities" && <OpportunitiesView data={opportunities.data}/>}
-      {!current.loading && tab==="portfolio" && <PortfolioView data={portfolio.data}/>}
-      {!current.loading && tab==="risk" && <RiskView data={risk.data}/>}
+      {!current.loading&&tab==="decision"&&<DecisionView data={decision.data}/>}
+      {!current.loading&&tab==="opportunities"&&<MarketView data={market.data} providers={providers.data} reload={market.load}/>}
+      {!current.loading&&tab==="portfolio"&&<PortfolioView data={portfolio.data}/>}
+      {!current.loading&&tab==="risk"&&<RiskView data={risk.data}/>}
     </main>
   </div>
 }
 
 function DecisionView({data}:{data:Json|null}){
-  return <>
-    <section className="heroGrid">
-      <div className="panel portfolioHero">
-        <div className="panelHead"><div><span>TODAY'S BEST ACTION</span><h2>{data?.action??"NO TRADE"}</h2></div><span className="status">{data?.status??"CHECKING"}</span></div>
-        <p className="thesis">{data?.reason??"The system is checking available evidence and risk constraints."}</p>
-        <div className="heroMetrics">
-          <div><span>Entry zone</span><b>{data?.entry??"—"}</b></div>
-          <div><span>Stop / invalidation</span><b>{data?.stop??"—"}</b></div>
-          <div><span>Profit target</span><b>{data?.target??"—"}</b></div>
-          <div><span>Position size</span><b>{data?.quantity??"—"}</b></div>
-        </div>
+  return <section className="heroGrid">
+    <div className="panel portfolioHero">
+      <div className="panelHead"><div><span>TODAY'S BEST ACTION</span><h2>{data?.action??"NO TRADE"}</h2></div><span className="status">{data?.status??"CHECKING"}</span></div>
+      <p className="thesis">{data?.reason??"The autonomous investment engine is evaluating market evidence."}</p>
+      <div className="heroMetrics">
+        <div><span>Entry zone</span><b>{data?.entry??"—"}</b></div>
+        <div><span>Stop / invalidation</span><b>{data?.stop??"—"}</b></div>
+        <div><span>Profit target</span><b>{data?.target??"—"}</b></div>
+        <div><span>Position size</span><b>{data?.quantity??"—"}</b></div>
       </div>
-      <div className="panel riskCard">
-        <div className="panelHead"><div><span>DECISION QUALITY</span><h3>Trade gate</h3></div><ShieldCheck className="shield"/></div>
-        <div className="riskRows">
-          <p><span>Confidence</span><b>{data?.confidence??"—"}</b></p>
-          <p><span>Max planned loss</span><b>${data?.maxPlannedLossUsd??0.75}</b></p>
-          <p><span>Minimum return hurdle</span><b>{data?.minModelledReturnPct??5}%+</b></p>
-          <p><span>Generated</span><b>{data?.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—"}</b></p>
-        </div>
-        <div className="danger"><AlertTriangle/> A valid result can be NO TRADE.</div>
+    </div>
+    <div className="panel riskCard">
+      <div className="panelHead"><div><span>DECISION QUALITY</span><h3>Trade gate</h3></div><ShieldCheck className="shield"/></div>
+      <div className="riskRows">
+        <p><span>Confidence</span><b>{data?.confidence??"—"}</b></p>
+        <p><span>Max planned loss</span><b>${data?.maxPlannedLossUsd??0.75}</b></p>
+        <p><span>Minimum return hurdle</span><b>{data?.minModelledReturnPct??5}%+</b></p>
+        <p><span>Generated</span><b>{data?.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—"}</b></p>
       </div>
-    </section>
-  </>
+      <div className="danger"><AlertTriangle/> A valid investment decision can be NO TRADE.</div>
+    </div>
+  </section>
 }
 
-function OpportunitiesView({data}:{data:Json|null}){
-  const rows=data?.opportunities??[];
+function MarketView({data,providers,reload}:{data:Json|null;providers:Json|null;reload:()=>void}){
+  const [filter,setFilter]=useState("ALL");
+  const [selected,setSelected]=useState<Quote|null>(null);
+  const [lookup,setLookup]=useState({symbol:"",assetClass:"EQUITY",region:"US"});
+  const [lookupResult,setLookupResult]=useState<Quote|null>(null);
+  const [lookupError,setLookupError]=useState("");
+  const quotes=(data?.quotes??[]) as Quote[];
+  const filtered=filter==="ALL"?quotes:quotes.filter(q=>q.assetClass===filter);
+  const configured=(providers?.providers??[]).filter((p:any)=>p.configured).length;
+  const liveCount=quotes.filter(q=>q.available&&!q.stale).length;
+
+  async function doLookup(){
+    setLookupError("");setLookupResult(null);
+    if(!lookup.symbol.trim())return;
+    const u=new URL("/api/market/quote",window.location.origin);
+    u.searchParams.set("symbol",lookup.symbol.trim());
+    u.searchParams.set("assetClass",lookup.assetClass);
+    u.searchParams.set("region",lookup.region);
+    try{
+      const r=await fetch(u,{cache:"no-store"});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.error||String(r.status));
+      setLookupResult(d);
+    }catch(e:any){setLookupError(e?.message||String(e));}
+  }
+
   return <>
-    <section className="sectionTitle"><div><p className="eyebrow">BEST AVAILABLE OPPORTUNITIES</p><h2>Daily market shortlist</h2></div></section>
-    <section className="panel tablePanel"><div className="table">
-      <div className="tr th"><span>Market</span><span>Status</span><span>Decision</span><span>Expected Return</span><span>Confidence</span><span>Risk</span><span></span></div>
-      {rows.map((m:any)=><div className="tr" key={m.market}>
-        <span className="asset"><b>{m.market}</b><small>Mandate-approved market</small></span>
-        <span>{m.status}</span><span className="pill watch">{m.decision}</span>
-        <span>{m.expectedReturn==null?"—":`${m.expectedReturn}%`}</span>
-        <span>{m.confidence==null?"—":`${m.confidence}%`}</span>
-        <span>0.5% max</span><span><ArrowRight style={{width:14}}/></span>
-      </div>)}
-    </div></section>
+    <section className="sectionTitle"><div><p className="eyebrow">LIVE MULTI-ASSET MARKET DATA</p><h2>Market shortlist</h2></div></section>
+
+    <section className="panel">
+      <div className="marketStrip">
+        <span>Live quotes <b>{liveCount}</b></span>
+        <span>Configured providers <b>{configured}</b></span>
+        <span>Auto refresh <b>10 sec</b></span>
+        <span>Last refresh <b>{data?.generatedAt?new Date(data.generatedAt).toLocaleTimeString():"—"}</b></span>
+      </div>
+      <div className="filters">
+        {ASSET_CLASSES.map(a=><button key={a} className={filter===a?"selected":""} onClick={()=>setFilter(a)}>{a}</button>)}
+      </div>
+    </section>
+
+    <section className="panel tablePanel">
+      <div className="table">
+        <div className="tr th"><span>Asset</span><span>Price</span><span>Change</span><span>Source</span><span>Freshness</span><span>Confidence</span><span>Status</span></div>
+        {filtered.map(q=><button className="tr marketRow" key={q.assetClass+q.symbol} onClick={()=>setSelected(q)}>
+          <span className="asset"><b>{q.symbol}</b><small>{q.assetClass} · {q.region}</small></span>
+          <span>{formatPrice(q.price,q.currency)}</span>
+          <span className={(q.changePct??0)>0?"good":(q.changePct??0)<0?"bad":""}>{q.changePct==null?"—":`${q.changePct.toFixed(2)}%`}</span>
+          <span>{q.source}</span>
+          <span>{q.stale?"STALE":q.delayed?"DELAYED":"LIVE"}</span>
+          <span>{q.confidence}%</span>
+          <span className={q.available?"pill buy":"pill watch"}>{q.available?"AVAILABLE":"UNAVAILABLE"}</span>
+        </button>)}
+      </div>
+    </section>
+
+    <section className="lowerGrid">
+      <div className="panel">
+        <div className="panelHead"><div><span>QUOTE INSPECTOR</span><h3>{selected?.symbol??"Click any asset"}</h3></div></div>
+        {selected?<div className="riskRows">
+          <p><span>Last</span><b>{formatPrice(selected.price,selected.currency)}</b></p>
+          <p><span>Bid</span><b>{formatPrice(selected.bid,selected.currency)}</b></p>
+          <p><span>Ask</span><b>{formatPrice(selected.ask,selected.currency)}</b></p>
+          <p><span>Source</span><b>{selected.source}</b></p>
+          <p><span>Observed</span><b>{selected.observedAt?new Date(selected.observedAt).toLocaleString():"—"}</b></p>
+          <p><span>Provider note</span><b>{selected.error??"Quote available"}</b></p>
+        </div>:<p className="thesis">Select an asset to inspect its live quote provenance and market quality.</p>}
+      </div>
+
+      <div className="panel">
+        <div className="panelHead"><div><span>CUSTOM LOOKUP</span><h3>Check another instrument</h3></div><Search/></div>
+        <div className="lookupForm">
+          <input value={lookup.symbol} onChange={e=>setLookup({...lookup,symbol:e.target.value})} placeholder="e.g. AAPL, BTC/USDT, GBP/USD"/>
+          <select value={lookup.assetClass} onChange={e=>setLookup({...lookup,assetClass:e.target.value})}>
+            {ASSET_CLASSES.filter(x=>x!=="ALL").map(x=><option key={x}>{x}</option>)}
+          </select>
+          <select value={lookup.region} onChange={e=>setLookup({...lookup,region:e.target.value})}>
+            <option value="US">US</option><option value="UK">UK</option><option value="NG">NG</option><option value="GLOBAL">GLOBAL</option>
+          </select>
+          <button onClick={doLookup}>GET LIVE QUOTE</button>
+        </div>
+        {lookupError&&<div className="danger">{lookupError}</div>}
+        {lookupResult&&<div className="riskRows">
+          <p><span>Price</span><b>{formatPrice(lookupResult.price,lookupResult.currency)}</b></p>
+          <p><span>Source</span><b>{lookupResult.source}</b></p>
+          <p><span>Status</span><b>{lookupResult.available?"AVAILABLE":"UNAVAILABLE"}</b></p>
+          <p><span>Message</span><b>{lookupResult.error??"Live quote returned"}</b></p>
+        </div>}
+      </div>
+    </section>
   </>
 }
 
@@ -154,10 +244,7 @@ function RiskView({data}:{data:Json|null}){
         <p><span>Live execution</span><b>{data?.liveExecution?"ON":"LOCKED"}</b></p>
       </div>
     </div>
-    <div className="panel stress">
-      <div className="panelHead"><div><span>KILL SWITCH</span><h3>{data?.killSwitch?"ARMED":"OFF"}</h3></div></div>
-      <p className="thesis">Critical data, reconciliation, drawdown or specialist veto conditions can block new trades.</p>
-    </div>
+    <div className="panel stress"><div className="panelHead"><div><span>KILL SWITCH</span><h3>{data?.killSwitch?"ARMED":"OFF"}</h3></div></div><p className="thesis">Critical data, reconciliation, drawdown or specialist veto conditions can block new trades.</p></div>
   </section>
 }
 
