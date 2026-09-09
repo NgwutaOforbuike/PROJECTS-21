@@ -39,3 +39,34 @@ evidence -> features -> agent opinions -> committee -> plan -> paper outcome -> 
 ## Non-negotiable permissions
 The learning system may change rankings and model weights only after validation.
 It may not increase risk limits or activate live execution by itself.
+
+
+## Expanded autonomous intelligence stack
+
+- technical_features.py — momentum, volatility, RSI, MACD, ATR, range and volume features.
+- forecasting.py — conservative multi-model return ensemble.
+- walk_forward.py — expanding-window out-of-sample validation.
+- data_quality.py — missing/stale/duplicate/impossible-price and extreme-move gates.
+- monte_carlo.py — bootstrap portfolio path simulation.
+- correlation.py — concentration/correlation alerts.
+- outcomes.py — prediction-versus-realised outcome memory.
+- promotion.py — quantitative promotion gates; live promotion is always denied without owner approval.
+- daily_cycle.py — end-to-end daily recommendation cycle.
+- research_score.py — primary/fresh/independent evidence scoring.
+- audit.py — hash-chained audit events.
+- connectors/fred.py — FRED macro observations.
+- connectors/bea.py — BEA economic data queries.
+- connectors/official_web.py — allowlisted snapshots from official Nigeria/UK authority websites.
+
+## Decision safety gates
+
+A recommendation is not considered decision-ready merely because an AI model likes it. The pipeline is designed to require:
+1. acceptable source/data quality;
+2. allowed geography;
+3. liquidity threshold;
+4. modelled return hurdle;
+5. committee support;
+6. 0.5% maximum planned equity risk;
+7. auditability and reproducibility.
+
+Backtest and paper results may change model weighting or strategy status after validation, but may not loosen the owner's mandate.
