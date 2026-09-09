@@ -27,10 +27,10 @@ jobs:
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
       - name: Install dependencies
         working-directory: nls-bar-apk
-        run: npm install
+        run: npm install --legacy-peer-deps
       - name: Align Expo dependencies
         working-directory: nls-bar-apk
-        run: npx expo install --fix
+        run: npx expo install --fix --non-interactive
       - name: Generate Android project
         working-directory: nls-bar-apk
         run: npx expo prebuild --platform android --non-interactive
