@@ -32,3 +32,19 @@ This is intentional: strategy logic can be wrong, market data can be stale, APIs
 - **Market data adapters**: can be independent from the execution broker.
 
 No single provider is assumed to cover every asset and jurisdiction.
+
+
+## Institutional feature benchmark
+
+The product roadmap now includes:
+- real-time market depth, spreads and liquidity monitoring
+- advanced conditional/bracket/algo-order adapters
+- factor, sector, geography and currency exposure analytics
+- VaR/CVaR, stress testing and what-if portfolios
+- intraday P&L and performance attribution
+- catalyst and macro event calendars
+- research/thesis notebook and post-trade review
+- execution quality, slippage and fill analytics
+- mandate/compliance monitoring, audit journal and exception escalation
+
+These modules are inspired by recurring capabilities in institutional portfolio/risk and execution platforms. They do not imply equivalence to any specific commercial platform.
