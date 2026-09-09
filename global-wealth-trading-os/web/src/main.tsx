@@ -44,12 +44,12 @@ function formatPrice(v:number|null,currency?:string|null){
 
 function App(){
   const [tab,setTab]=useState<Tab>("opportunities");
-  const mandate=useApi("/api/mandate");
-  const decision=useApi("/api/decision",15000);
-  const market=useApi("/api/market/quotes",10000);
-  const providers=useApi("/api/market/providers",30000);
-  const portfolio=useApi("/api/portfolio",15000);
-  const risk=useApi("/api/risk",15000);
+  const mandate=useApi("/api/app?mode=mandate");
+  const decision=useApi("/api/app?mode=decision",15000);
+  const market=useApi("/api/market?mode=quotes",10000);
+  const providers=useApi("/api/market?mode=providers",30000);
+  const portfolio=useApi("/api/app?mode=portfolio",15000);
+  const risk=useApi("/api/app?mode=risk",15000);
 
   const current=useMemo(()=>({decision,opportunities:market,portfolio,risk}[tab]),[tab,decision,market,portfolio,risk]);
   const nav=[
@@ -135,7 +135,8 @@ function MarketView({data,providers,reload}:{data:Json|null;providers:Json|null;
   async function doLookup(){
     setLookupError("");setLookupResult(null);
     if(!lookup.symbol.trim())return;
-    const u=new URL("/api/market/quote",window.location.origin);
+    const u=new URL("/api/market",window.location.origin);
+    u.searchParams.set("mode","quote");
     u.searchParams.set("symbol",lookup.symbol.trim());
     u.searchParams.set("assetClass",lookup.assetClass);
     u.searchParams.set("region",lookup.region);
