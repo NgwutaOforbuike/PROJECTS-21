@@ -12,7 +12,8 @@ dependencies = [
   "pandas>=2.2,<3",
   "scikit-learn>=1.5,<2",
   "sqlalchemy>=2.0,<3",
-  "aiosqlite>=0.20,<1"
+  "aiosqlite>=0.20,<1",
+  "joblib>=1.4,<2"
 ]
 
 [project.optional-dependencies]
