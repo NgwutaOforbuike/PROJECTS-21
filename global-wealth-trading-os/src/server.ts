@@ -21,13 +21,13 @@ const portfolio:Portfolio={
 const limits:RiskLimits={
   maxPositionPct:10,
   maxGrossExposurePct:80,
-  maxSingleTradeRiskPct:0.75,
+  maxSingleTradeRiskPct:0.5,
   maxPortfolioDrawdownPct:12,
   maxVolatilityPct:45,
   allowLeverage:false,
   killSwitch:false,
   allowedCountries:["Nigeria","United States","United Kingdom"],
-  targetDailyReturnPct:15
+  targetDailyReturnPct:5
 };
 
 const proposals=new Map<string,TradeProposal>();
@@ -39,6 +39,54 @@ app.get("/risk-limits",async()=>limits);
 app.get("/providers",async()=>providerRoadmap);
 app.get("/proposals",async()=>Array.from(proposals.values()));
 app.get("/paper/fills",async()=>paper.fills);
+
+app.post<{Body:MarketSnapshot[]}>("/daily-best",async(req,reply)=>{
+  const ranked=req.body
+    .map(snapshot=>{
+      const signal=scoreMarket(snapshot);
+      const risk=evaluateRisk(snapshot,signal,portfolio,limits);
+      return {snapshot,signal,risk};
+    })
+    .filter(x=>x.risk.allowed && x.risk.proposal)
+    .sort((a,b)=>{
+      const ar=a.snapshot.expectedDailyReturnPct ?? 0;
+      const br=b.snapshot.expectedDailyReturnPct ?? 0;
+      return (br*0.6+b.signal.score*0.4)-(ar*0.6+a.signal.score*0.4);
+    });
+
+  if(!ranked.length){
+    return {
+      action:"NO_TRADE",
+      reason:"No allowed-market setup clears both the 5% modelled return hurdle and the risk governor.",
+      riskPerTradePct:limits.maxSingleTradeRiskPct
+    };
+  }
+
+  const best=ranked[0];
+  const p=best.risk.proposal!;
+  return {
+    action:"BEST_SETUP",
+    asset:p.asset,
+    expectedDailyReturnPct:best.snapshot.expectedDailyReturnPct,
+    confidence:best.signal.confidence,
+    entryZone:{
+      low:Number((p.referencePrice*0.9975).toFixed(6)),
+      high:Number((p.referencePrice*1.0025).toFixed(6))
+    },
+    stopLoss:p.stopLoss,
+    takeProfit:p.takeProfit,
+    quantity:p.quantity,
+    maxRiskAmount:p.riskAmount,
+    riskPerTradePct:limits.maxSingleTradeRiskPct,
+    exitRules:[
+      "Exit immediately if stop-loss is reached.",
+      "Take profit at the configured target unless the strategy has explicitly upgraded the target.",
+      "Exit early if the signal falls below BUY or the investment thesis is invalidated.",
+      "If neither target nor stop is reached, reassess before the venue closes."
+    ],
+    reasons:[...best.signal.reasons,...best.risk.reasons]
+  };
+});
 
 app.post<{Body:MarketSnapshot}>("/scan",async(req,reply)=>{
   const signal=scoreMarket(req.body);
