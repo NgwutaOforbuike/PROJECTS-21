@@ -22,6 +22,9 @@ from .model_registry import ModelRegistry
 from .dataset_registry import DatasetRegistry
 from .retraining import should_retrain
 from .learning_cycle import LearningCycle
+from .investment_engine import AutonomousInvestmentEngine
+from .agent_context import InvestmentContext
+from .security import posture as security_posture
 
 app = FastAPI(title="Global Wealth AI", version="0.1.0")
 kb = KnowledgeBase()
@@ -34,6 +37,7 @@ model_artifacts = ModelArtifactStore()
 model_registry = ModelRegistry()
 dataset_registry = DatasetRegistry()
 learning_cycle_engine = LearningCycle(training=training_service)
+investment_engine = AutonomousInvestmentEngine()
 
 
 class DailyBestRequest(BaseModel):
@@ -551,3 +555,29 @@ async def learning_cycle(req: LearningCycleRequest) -> dict:
     }
     audit.append("LEARNING_CYCLE","learning-engine",payload)
     return payload
+
+
+@app.post("/investment/decide")
+async def investment_decide(ctx: InvestmentContext) -> dict:
+    result = await investment_engine.decide(ctx)
+    payload = {
+        "action": result.action,
+        "committee": {
+            "score": result.committee.score,
+            "confidence": result.committee.confidence,
+            "buy_votes": result.committee.buy_votes,
+            "avoid_votes": result.committee.avoid_votes,
+            "vetoes": result.committee.vetoes,
+            "decision": result.committee.decision,
+            "reasons": result.committee.reasons,
+        },
+        "trade_plan": result.trade_plan.model_dump(mode="json") if result.trade_plan else None,
+        "blockers": result.blockers,
+    }
+    audit.append("INVESTMENT_DECISION","autonomous-investment-engine",payload)
+    return payload
+
+
+@app.get("/security/posture")
+async def security_posture_endpoint() -> dict:
+    return security_posture().__dict__
