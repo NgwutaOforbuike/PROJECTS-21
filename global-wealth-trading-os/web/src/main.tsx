@@ -1,10 +1,10 @@
 import React,{useEffect,useMemo,useState} from "react";
 import {createRoot} from "react-dom/client";
-import {AlertTriangle,Globe2,Lightbulb,LockKeyhole,MessageSquare,Plus,RefreshCw,Search,Send,ShieldCheck,Target,WalletCards} from "lucide-react";
+import {AlertTriangle,BookOpen,Brain,Database,Globe2,Lightbulb,LockKeyhole,LogOut,MessageSquare,PlugZap,Plus,RefreshCw,Search,Send,ShieldCheck,Target,WalletCards} from "lucide-react";
 import "./styles.css";
 import {buildInfo} from "./buildInfo";
 
-type Tab="decision"|"opportunities"|"portfolio"|"risk"|"brainstorm";
+type Tab="decision"|"opportunities"|"portfolio"|"risk"|"research"|"models"|"data"|"integrations"|"brainstorm";
 type Json=Record<string,any>;
 type Quote={
   symbol:string;assetClass:string;region:string;price:number|null;bid:number|null;ask:number|null;
@@ -42,7 +42,30 @@ function formatPrice(v:number|null,currency?:string|null){
   return `${currency==="USD"?"$":""}${v.toLocaleString(undefined,{maximumFractionDigits:max})}`;
 }
 
-function App(){
+function Root(){
+  const [session,setSession]=useState<Json|null>(null);
+  const [checking,setChecking]=useState(true);
+  const check=async()=>{try{const r=await fetch("/api/auth/session",{cache:"no-store"});setSession(await r.json());}finally{setChecking(false)}};
+  useEffect(()=>{check()},[]);
+  if(checking)return <div className="authShell"><div className="authCard"><div className="mark large">GW</div><h1>Global Wealth OS</h1><p>Verifying private workspace…</p></div></div>;
+  if(!session?.authenticated)return <SignIn configured={Boolean(session?.configured)} onSuccess={check}/>;
+  return <App user={session.user} onLogout={async()=>{await fetch("/api/auth/logout",{method:"POST"});await check()}}/>;
+}
+
+function SignIn({configured,onSuccess}:{configured:boolean;onSuccess:()=>void}){
+  const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [error,setError]=useState("");const [loading,setLoading]=useState(false);
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();setLoading(true);setError("");try{const r=await fetch("/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Sign-in failed");await onSuccess()}catch(e:any){setError(e.message||String(e))}finally{setLoading(false)}};
+  return <div className="authShell"><form className="authCard" onSubmit={submit}>
+    <div className="mark large">GW</div><p className="eyebrow">PRIVATE INVESTMENT INTELLIGENCE</p><h1>Welcome back</h1><p>Sign in to your personal multi-asset command centre.</p>
+    {!configured&&<div className="danger"><AlertTriangle/>Owner authentication awaits secure deployment variables.</div>}
+    <label>Email<input type="email" autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)} required/></label>
+    <label>Password<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={12}/></label>
+    {error&&<div className="danger">{error}</div>}<button className="primary" disabled={loading||!configured}>{loading?"SIGNING IN…":"SIGN IN"}</button>
+    <small>Paper trading only · Live execution locked · 12-hour secure session</small>
+  </form></div>;
+}
+
+function App({user,onLogout}:{user:Json;onLogout:()=>void}){
   const [tab,setTab]=useState<Tab>("opportunities");
   const mandate=useApi("/api/app?mode=mandate");
   const decision=useApi("/api/app?mode=decision",15000);
@@ -50,20 +73,29 @@ function App(){
   const providers=useApi("/api/market?mode=providers",30000);
   const portfolio=useApi("/api/app?mode=portfolio",15000);
   const risk=useApi("/api/app?mode=risk",15000);
+  const research=useApi("/api/system?mode=research");
+  const models=useApi("/api/system?mode=models");
+  const integrations=useApi("/api/system?mode=integrations",30000);
+  const data=research;
 
-  const current=useMemo(()=>({decision,opportunities:market,portfolio,risk}[tab as Exclude<Tab,"brainstorm">]??decision),[tab,decision,market,portfolio,risk]);
   const nav=[
     ["decision","Today's Decision",Target],
     ["opportunities","Opportunities",Globe2],
     ["portfolio","Portfolio",WalletCards],
     ["risk","Risk & Exposure",ShieldCheck],
+    ["research","Research Library",BookOpen],
+    ["models","Models & Training",Brain],
+    ["data","Data Governance",Database],
+    ["integrations","Integrations",PlugZap],
     ["brainstorm","Brainstorm",MessageSquare],
   ] as const;
+  const current=useMemo(()=>({decision,opportunities:market,portfolio,risk,research,models,data,integrations}[tab as Exclude<Tab,"brainstorm">]??decision),[tab,decision,market,portfolio,risk,research,models,data,integrations]);
 
   return <div className="app">
     <aside className="sidebar">
       <div className="brand"><div className="mark">GW</div><div><strong>Global Wealth</strong><span>Investment OS</span></div></div>
       <nav>{nav.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={tab===id?"active":""}><Icon/>{label}</button>)}</nav>
+      <div className="owner"><span>{user?.email}</span><button onClick={onLogout}><LogOut/> Sign out</button></div>
       <div className="guard"><LockKeyhole/><div><b>Live execution locked</b><span>Interactive analysis · owner approval required</span><span>{buildInfo.source}</span></div></div>
     </aside>
 
@@ -73,7 +105,11 @@ function App(){
           tab==="decision"?"What should I do with my capital today?":
           tab==="opportunities"?"Where are the best opportunities?":
           tab==="portfolio"?"What do I own and how is capital allocated?":
-          tab==="risk"?"How much risk am I carrying?":"Brainstorm and test investment ideas"
+          tab==="risk"?"How much risk am I carrying?":
+          tab==="research"?"What evidence supports each decision?":
+          tab==="models"?"How are models trained and governed?":
+          tab==="data"?"Is the training data reliable and lawful?":
+          tab==="integrations"?"Which services are genuinely connected?":"Brainstorm and test investment ideas"
         }</h1></div>
         {tab!=="brainstorm"&&<button className="status" onClick={current.load}><RefreshCw style={{width:14}}/> REFRESH</button>}
       </header>
@@ -93,44 +129,34 @@ function App(){
       {!current.loading&&tab==="opportunities"&&<MarketView data={market.data} providers={providers.data} reload={market.load}/>}
       {!current.loading&&tab==="portfolio"&&<PortfolioView data={portfolio.data}/>}
       {!current.loading&&tab==="risk"&&<RiskView data={risk.data}/>}
+      {!current.loading&&tab==="research"&&<ResearchView data={research.data}/>}
+      {!current.loading&&tab==="models"&&<ModelsView data={models.data}/>}
+      {!current.loading&&tab==="data"&&<DataView data={data.data}/>}
+      {!current.loading&&tab==="integrations"&&<IntegrationsView data={integrations.data}/>}
       {tab==="brainstorm"&&<BrainstormView/>}
     </main>
   </div>
 }
 
-type ChatMessage={role:"user"|"assistant";content:string;createdAt:string;sources?:{label:string;url:string}[]};
+function ListPanel({title,items}:{title:string;items:string[]}){return <div className="panel listPanel"><div className="panelHead"><div><span>CONTROL FRAMEWORK</span><h3>{title}</h3></div></div><ul>{items.map(x=><li key={x}>{x}</li>)}</ul></div>}
+function ResearchView({data}:{data:Json|null}){return <section className="lowerGrid"><ListPanel title="Approved source families" items={data?.sources??[]}/><ListPanel title="Evidence rules" items={data?.rules??[]}/></section>}
+function ModelsView({data}:{data:Json|null}){return <section className="lowerGrid"><ListPanel title="Strategy lifecycle" items={data?.lifecycle??[]}/><ListPanel title="Promotion controls" items={data?.controls??[]}/></section>}
+function DataView({data}:{data:Json|null}){return <section className="heroGrid"><div className="panel portfolioHero"><div className="panelHead"><div><span>TRAINING DATA</span><h2>Evidence before prediction</h2></div><span className="status">{data?.driveStatus??"CHECKING"}</span></div><p className="thesis">Every observation must retain provenance, publication time, licence, quality status and immutable dataset version. Drive is an archive, not the live transactional database.</p></div><ListPanel title="Required safeguards" items={["point-in-time timestamps","survivorship-bias controls","corporate-action adjustments","chronological train/validation/test splits","dataset hashes and lineage"]}/></section>}
+function IntegrationsView({data}:{data:Json|null}){return <section className="panel tablePanel"><div className="table"><div className="tr integration th"><span>Service</span><span>Category</span><span>Cost position</span><span>Status</span></div>{(data?.services??[]).map((x:any)=><div className="tr integration" key={x.name}><span className="asset"><b>{x.name}</b></span><span>{x.category}</span><span>{x.cost}</span><span className={x.configured?"pill buy":"pill watch"}>{x.status}</span></div>)}</div></section>}
 
+type ChatMessage={role:"user"|"assistant";content:string;createdAt:string;sources?:{label:string;url:string}[]};
 function BrainstormView(){
   const initial:ChatMessage={role:"assistant",content:"What investment question should we explore? I can structure a thesis, test assumptions, compare Nigeria, the UK and the US, or turn an idea into a research plan. I cannot place trades.",createdAt:new Date().toISOString()};
   const [messages,setMessages]=useState<ChatMessage[]>(()=>{try{return JSON.parse(localStorage.getItem("gwai-brainstorm")||"")||[initial]}catch{return [initial]}});
-  const [prompt,setPrompt]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
+  const [prompt,setPrompt]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   useEffect(()=>localStorage.setItem("gwai-brainstorm",JSON.stringify(messages.slice(-50))),[messages]);
   const reset=()=>{setMessages([initial]);setError("")};
   async function send(){
-    const text=prompt.trim(); if(!text||busy)return;
-    const next=[...messages,{role:"user" as const,content:text,createdAt:new Date().toISOString()}];
+    const text=prompt.trim();if(!text||busy)return;const next=[...messages,{role:"user" as const,content:text,createdAt:new Date().toISOString()}];
     setMessages(next);setPrompt("");setBusy(true);setError("");
-    try{
-      const r=await fetch("/api/brainstorm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:text,history:next.slice(-10)})});
-      const d=await r.json(); if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);
-      setMessages(m=>[...m,{role:"assistant",content:d.answer,createdAt:new Date().toISOString(),sources:d.sources||[]}]);
-    }catch(e:any){setError(e?.message||String(e));}
-    finally{setBusy(false)}
+    try{const r=await fetch("/api/brainstorm",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:text,history:next.slice(-10)})});const d=await r.json();if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);setMessages(m=>[...m,{role:"assistant",content:d.answer,createdAt:new Date().toISOString(),sources:d.sources||[]}])}catch(e:any){setError(e?.message||String(e))}finally{setBusy(false)}
   }
-  return <section className="brainstormShell">
-    <div className="panel brainstormRail">
-      <button className="newChat" onClick={reset}><Plus/>New brainstorm</button>
-      <div className="ideaCard"><Lightbulb/><b>Useful prompts</b><span>Stress-test an investment thesis</span><span>Compare a company across NG, UK and US peers</span><span>Build a due-diligence checklist</span><span>Explain what evidence would change my view</span></div>
-      <div className="guardrail"><LockKeyhole/><span>Analysis only. No order can be transmitted from this workspace.</span></div>
-    </div>
-    <div className="panel chatPanel">
-      <div className="chatMessages">{messages.map((m,i)=><article key={i} className={`chatMessage ${m.role}`}><div className="chatAvatar">{m.role==="user"?"YOU":"GW"}</div><div><b>{m.role==="user"?"You":"Global Wealth AI"}</b><p>{m.content}</p>{m.sources?.length?<div className="chatSources">{m.sources.map((s,j)=><a key={j} href={s.url} target="_blank" rel="noreferrer">{s.label}</a>)}</div>:null}</div></article>)}{busy&&<article className="chatMessage assistant"><div className="chatAvatar">GW</div><div><b>Global Wealth AI</b><p>Thinking through the evidence and risks…</p></div></article>}</div>
-      {error&&<div className="danger">{error}</div>}
-      <div className="composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}} maxLength={4000} placeholder="Ask about an asset, company, strategy, risk or research idea…"/><button onClick={send} disabled={busy||!prompt.trim()} aria-label="Send"><Send/></button><small>Enter to send · Shift+Enter for a new line · Threads are saved on this device</small></div>
-    </div>
-  </section>
+  return <section className="brainstormShell"><div className="panel brainstormRail"><button className="newChat" onClick={reset}><Plus/>New brainstorm</button><div className="ideaCard"><Lightbulb/><b>Useful prompts</b><span>Stress-test an investment thesis</span><span>Compare a company across NG, UK and US peers</span><span>Build a due-diligence checklist</span><span>Explain what evidence would change my view</span></div><div className="guardrail"><LockKeyhole/><span>Analysis only. No order can be transmitted from this workspace.</span></div></div><div className="panel chatPanel"><div className="chatMessages">{messages.map((m,i)=><article key={i} className={`chatMessage ${m.role}`}><div className="chatAvatar">{m.role==="user"?"YOU":"GW"}</div><div><b>{m.role==="user"?"You":"Global Wealth AI"}</b><p>{m.content}</p>{m.sources?.length?<div className="chatSources">{m.sources.map((s,j)=><a key={j} href={s.url} target="_blank" rel="noreferrer">{s.label}</a>)}</div>:null}</div></article>)}{busy&&<article className="chatMessage assistant"><div className="chatAvatar">GW</div><div><b>Global Wealth AI</b><p>Thinking through the evidence and risks…</p></div></article>}</div>{error&&<div className="danger">{error}</div>}<div className="composer"><textarea value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}} maxLength={4000} placeholder="Ask about an asset, company, strategy, risk or research idea…"/><button onClick={send} disabled={busy||!prompt.trim()} aria-label="Send"><Send/></button><small>Enter to send · Shift+Enter for a new line · Threads are saved on this device</small></div></div></section>
 }
 
 function DecisionView({data}:{data:Json|null}){
@@ -286,4 +312,4 @@ function RiskView({data}:{data:Json|null}){
   </section>
 }
 
-createRoot(document.getElementById("root")!).render(<App/>);
+createRoot(document.getElementById("root")!).render(<Root/>);
