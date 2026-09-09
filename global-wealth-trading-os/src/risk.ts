@@ -81,7 +81,7 @@ export function evaluateRisk(
       referencePrice:snapshot.price,
       limitPrice:snapshot.price,
       stopLoss:Number((snapshot.price-stopDistance).toFixed(6)),
-      takeProfit:Number((snapshot.price+stopDistance*2).toFixed(6)),
+      takeProfit:Number((snapshot.price * (1 + Math.max(limits.targetDailyReturnPct, stopDistancePct*2)/100)).toFixed(6)),
       riskAmount:Number((quantity*stopDistance).toFixed(2)),
       signal
     }
