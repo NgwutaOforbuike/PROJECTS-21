@@ -80,3 +80,20 @@ Backtest and paper results may change model weighting or strategy status after v
 - database.py — SQLAlchemy persistence for decisions, evidence and realised outcomes.
 
 These controls sit outside the forecasting models so a model cannot suppress its own risk, data-quality or reconciliation alarms.
+
+
+## Governed training lifecycle
+
+- dataset_builder.py — constructs labelled supervised datasets from provenance-labelled OHLCV observations.
+- leakage.py — blocks temporal leakage, target contamination, duplicate timestamps and invalid split ordering.
+- splits.py — strictly chronological train/validation/test partitions.
+- trainer.py — fits multiple candidate regressors, selects on validation data and evaluates once on held-out test data.
+- model_artifacts.py — persists model binaries with SHA-256 integrity hashes and metadata.
+- dataset_registry.py — records dataset lineage, source IDs, timestamps, feature/label versions and dataset hashes.
+- model_registry.py — champion/challenger promotion history by strategy.
+- champion_challenger.py — prevents automatic replacement unless the challenger clears minimum validation criteria.
+- retraining.py — retraining triggers based on model age, new clean observations or drift.
+- training_service.py — end-to-end dataset -> train -> artifact -> registry pipeline.
+- training_cli.py — reproducible command-line training entry point.
+
+Production models are trained only on time-ordered, provenance-labelled datasets. The system never trains on the held-out test set and never promotes directly to live execution.
