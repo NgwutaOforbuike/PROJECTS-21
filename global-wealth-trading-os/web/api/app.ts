@@ -1,4 +1,7 @@
+import {requireOwner} from "../lib/auth";
+
 export default function handler(req:any,res:any){
+  if(!requireOwner(req,res))return;
   const mode=String(req.query?.mode||"mandate");
   res.setHeader("Cache-Control","no-store, max-age=0");
   if(mode==="mandate") return res.status(200).json({

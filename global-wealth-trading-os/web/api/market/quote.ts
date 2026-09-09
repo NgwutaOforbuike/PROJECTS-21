@@ -1,7 +1,9 @@
 import {getQuote} from "../../lib/market/router";
 import type {AssetClass,Region} from "../../lib/market/types";
+import {requireOwner} from "../../lib/auth";
 
 export default async function handler(req:any,res:any){
+  if(!requireOwner(req,res))return;
   if(req.method!=="GET") return res.status(405).json({error:"Method not allowed"});
   const {symbol,assetClass,region,providerHint,providerSymbol}=req.query||{};
   if(!symbol||!assetClass||!region) return res.status(400).json({error:"symbol, assetClass and region are required"});

@@ -1,5 +1,6 @@
 import {getQuotes} from "../../lib/market/router";
 import type {InstrumentRequest} from "../../lib/market/types";
+import {requireOwner} from "../../lib/auth";
 
 const DEFAULTS:InstrumentRequest[]=[
   {symbol:"NVDA",assetClass:"EQUITY",region:"US"},
@@ -18,6 +19,7 @@ const DEFAULTS:InstrumentRequest[]=[
 ];
 
 export default async function handler(req:any,res:any){
+  if(!requireOwner(req,res))return;
   if(req.method!=="GET"&&req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   let requests:InstrumentRequest[]=DEFAULTS;
   if(req.method==="POST"){

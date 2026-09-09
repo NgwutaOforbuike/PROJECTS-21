@@ -1,4 +1,5 @@
 type AssetClass="EQUITY"|"ETF"|"OPTION"|"FUTURE"|"FX"|"CRYPTO"|"BOND"|"FUND"|"COMMODITY"|"CASH";
+import {requireOwner} from "../lib/auth";
 type Region="NG"|"US"|"UK"|"GLOBAL";
 type Req={symbol:string;assetClass:AssetClass;region:Region;providerHint?:string;providerSymbol?:string;metadata?:Record<string,any>};
 type Quote={symbol:string;assetClass:AssetClass;region:Region;price:number|null;bid:number|null;ask:number|null;previousClose:number|null;change:number|null;changePct:number|null;volume:number|null;currency:string|null;marketState:string|null;observedAt:string|null;receivedAt:string;source:string;sourceTier:1|2|3|4;delayed:boolean;stale:boolean;confidence:number;available:boolean;error?:string};
@@ -112,6 +113,7 @@ const defaults:Req[]=[
 ];
 
 export default async function handler(req:any,res:any){
+  if(!requireOwner(req,res))return;
   res.setHeader("Cache-Control","no-store, max-age=0");
   const mode=String(req.query?.mode||"quotes");
   if(mode==="providers")return res.status(200).json({generatedAt:now(),providers:[

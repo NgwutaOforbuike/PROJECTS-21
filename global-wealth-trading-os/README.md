@@ -2,7 +2,7 @@
 
 Personal multi-asset trading operating system.
 
-## Stage 1 scope
+## Current scope
 
 This branch implements the safety-critical core before any live brokerage credentials are connected:
 
@@ -16,6 +16,32 @@ This branch implements the safety-critical core before any live brokerage creden
 - approval gate for live execution
 - provider adapter interfaces for IBKR, Alpaca, Binance/Bybit and FX/CFD venues
 - API endpoints for scanning, proposing, approving and paper-executing trades
+- private owner sign-in with a signed, HTTP-only session cookie
+- research, model, data-source and integration status screens
+- protected market, portfolio, risk, mandate and decision APIs
+
+## Run locally
+
+The repository contains the TypeScript trading core at the root and the Vite/Vercel application in `web/`.
+
+1. Copy `.env.example` to `.env.local` and keep that file private.
+2. Generate the owner password hash with `node scripts/hash-password.mjs`.
+3. Set `OWNER_EMAIL`, `OWNER_PASSWORD_HASH`, and a long random `AUTH_SECRET` in `web/.env.local` or the Vercel project environment.
+4. Install and validate the core with `npm install`, `npm test`, and `npm run build`.
+5. Install and validate the web app with `cd web`, `npm install`, `npm run build`, and `npm run typecheck:api`.
+
+For Vercel, set the project Root Directory to `web`. Keep Deployment Protection enabled until owner authentication is configured. The Vercel Hobby plan can host this stage without enabling Google Cloud billing, subject to Vercel's current usage limits.
+
+## Optional integrations
+
+The app reports each integration truthfully as configured, missing, or deferred. API keys remain server-side environment variables and must never be committed.
+
+- Binance public market data works without a key.
+- FRED and Twelve Data can be added for macro and multi-asset data.
+- Alpaca can be connected for paper brokerage; live execution remains disabled.
+- Google Drive is an optional research archive.
+- Google Cloud is deferred until long-running model jobs genuinely require it.
+- The Python intelligence service is separate from the Vercel frontend and is not presented as deployed until `PYTHON_AI_URL` points to a working service.
 
 ## Execution policy
 

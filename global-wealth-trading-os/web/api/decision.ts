@@ -1,4 +1,6 @@
+import {requireOwner} from "../lib/auth";
 export default function handler(req:any,res:any){
+  if(!requireOwner(req,res))return;
   res.status(200).json({
     action:"NO_TRADE",
     status:"WAITING_FOR_QUALIFIED_LIVE_MARKET_DATA",
