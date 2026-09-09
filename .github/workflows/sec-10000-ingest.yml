@@ -44,7 +44,7 @@ jobs:
           echo "Full filings available: $TOTAL"
           test "$TOTAL" -ge 10000
 
-      - name: Select 10000 complete filings
+      - name: Select exactly 10000 complete filings
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -52,57 +52,113 @@ jobs:
 
           src = Path("sec_all")
           dst = Path("sec_selected")
-          files = sorted(
-              src.rglob("10-K_*.md"),
-              key=lambda p: (p.stat().st_size, str(p))
-          )
+          files = sorted(src.rglob("10-K_*.md"), key=lambda p: (p.stat().st_size, str(p)))
           selected = files[:10000]
-          assert len(selected) == 10000, f"Expected 10000, got {len(selected)}"
+          assert len(selected) == 10000
 
-          with open("selected_files.txt", "w", encoding="utf-8") as out:
-              for p in selected:
-                  rel = p.relative_to(src)
-                  target = dst / rel
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  shutil.copy2(p, target)
-                  out.write(str(rel) + "\n")
+          for i, p in enumerate(selected):
+              rel = p.relative_to(src)
+              target = dst / rel
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(p, target)
 
           count = sum(1 for _ in dst.rglob("10-K_*.md"))
           print(f"Selected complete filings: {count}")
           assert count == 10000
           PY
 
-      - name: Build acquisition and integrity manifests
-        shell: bash
+      - name: Build integrity manifests and five transfer-safe bundles
         run: |
-          cd sec_selected
-          find . -type f -name '10-K_*.md' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
-          COUNT=$(find . -type f -name '10-K_*.md' | wc -l)
-          {
-            echo "source_dataset=astr010/sec-10k-markdown-compressed"
-            echo "source_dataset_url=https://huggingface.co/datasets/astr010/sec-10k-markdown-compressed"
-            echo "underlying_source=U.S. Securities and Exchange Commission EDGAR"
-            echo "document_type=SEC Form 10-K full-length Markdown"
-            echo "acquired_documents=$COUNT"
-            echo "selection=10000 smallest complete filings by byte size from 12361-document corpus"
-            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "dataset_license=MIT"
-            echo "underlying_SEC_filings=US Government public records"
-          } > ACQUISITION_MANIFEST.txt
-          test "$COUNT" -eq 10000
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, tarfile, datetime
 
-      - name: Package verified corpus
-        run: |
-          tar -czf artifacts/sec_edgar_10000_full_10k_documents.tar.gz -C sec_selected .
-          ls -lh artifacts/sec_edgar_10000_full_10k_documents.tar.gz
-          sha256sum artifacts/sec_edgar_10000_full_10k_documents.tar.gz > artifacts/PACKAGE_SHA256.txt
+          root = Path("sec_selected")
+          artifacts = Path("artifacts")
+          files = sorted(root.rglob("10-K_*.md"))
+          assert len(files) == 10000
 
-      - name: Upload verified corpus artifact
+          sha_lines = []
+          for p in files:
+              h = hashlib.sha256()
+              with p.open("rb") as f:
+                  for chunk in iter(lambda: f.read(1024*1024), b""):
+                      h.update(chunk)
+              sha_lines.append(f"{h.hexdigest()}  {p.relative_to(root)}")
+          (artifacts/"SHA256SUMS.txt").write_text("\n".join(sha_lines)+"\n", encoding="utf-8")
+
+          manifest = [
+              "source_dataset=astr010/sec-10k-markdown-compressed",
+              "source_dataset_url=https://huggingface.co/datasets/astr010/sec-10k-markdown-compressed",
+              "underlying_source=U.S. Securities and Exchange Commission EDGAR",
+              "document_type=SEC Form 10-K full-length Markdown",
+              "acquired_documents=10000",
+              "selection=10000 smallest complete filings by byte size from 12361-document corpus",
+              f"acquisition_utc={datetime.datetime.now(datetime.timezone.utc).isoformat()}",
+              "dataset_license=MIT",
+              "underlying_SEC_filings=US Government public records",
+              "bundle_count=5",
+              "documents_per_bundle=2000",
+          ]
+          (artifacts/"ACQUISITION_MANIFEST.txt").write_text("\n".join(manifest)+"\n", encoding="utf-8")
+
+          for idx in range(5):
+              subset = files[idx*2000:(idx+1)*2000]
+              out = artifacts / f"sec_edgar_10000_part_{idx+1}_of_5.tar.gz"
+              with tarfile.open(out, "w:gz") as tf:
+                  for p in subset:
+                      tf.add(p, arcname=str(p.relative_to(root)))
+              print(f"Bundle {idx+1}: documents={len(subset)} bytes={out.stat().st_size}")
+              assert len(subset) == 2000
+              assert out.stat().st_size < 480*1024*1024, f"Bundle {idx+1} exceeds transfer-safe size"
+          PY
+
+      - name: Upload bundle 1
         uses: actions/upload-artifact@v4
         with:
-          name: sec-edgar-10000-full-10k-documents
-          path: |
-            artifacts/sec_edgar_10000_full_10k_documents.tar.gz
-            artifacts/PACKAGE_SHA256.txt
+          name: sec-edgar-10000-part-1-of-5
+          path: artifacts/sec_edgar_10000_part_1_of_5.tar.gz
           retention-days: 1
           compression-level: 0
+
+      - name: Upload bundle 2
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-part-2-of-5
+          path: artifacts/sec_edgar_10000_part_2_of_5.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload bundle 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-part-3-of-5
+          path: artifacts/sec_edgar_10000_part_3_of_5.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload bundle 4
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-part-4-of-5
+          path: artifacts/sec_edgar_10000_part_4_of_5.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload bundle 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-part-5-of-5
+          path: artifacts/sec_edgar_10000_part_5_of_5.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+      - name: Upload manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-manifests
+          path: |
+            artifacts/SHA256SUMS.txt
+            artifacts/ACQUISITION_MANIFEST.txt
+          retention-days: 1
+          compression-level: 6
