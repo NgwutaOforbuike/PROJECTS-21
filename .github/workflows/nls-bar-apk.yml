@@ -1,47 +1,10 @@
-name: Build NLS Bar Finals APK
+name: NLS APK Cloud Test
 on:
   push:
-    branches: [nls-bar-apk-build]
-  workflow_dispatch:
+    branches:
+      - nls-bar-apk-build
 jobs:
-  android:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: nls-bar-apk/package-lock.json
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v3
-      - name: Install Android SDK 36
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Install dependencies
-        working-directory: nls-bar-apk
-        run: npm install
-      - name: Align Expo dependencies
-        working-directory: nls-bar-apk
-        run: npx expo install --fix --non-interactive
-      - name: Generate Android project
-        working-directory: nls-bar-apk
-        run: npx expo prebuild --platform android --non-interactive
-      - name: Build installable debug APK
-        working-directory: nls-bar-apk/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-      - name: Prepare APK
-        run: |
-          mkdir -p output
-          cp nls-bar-apk/android/app/build/outputs/apk/debug/app-debug.apk output/NLS-Bar-Finals.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: NLS-Bar-Finals-APK
-          path: output/NLS-Bar-Finals.apk
-          if-no-files-found: error
-}
+      - run: echo "GitHub runner is working"
