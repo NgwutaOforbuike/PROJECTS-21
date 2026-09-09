@@ -1,0 +1,19 @@
+import React,{useMemo,useState} from 'react';
+import {ScrollView,View,Text,Pressable,Alert,StyleSheet} from 'react-native';
+import {useLocalSearchParams,router} from 'expo-router';
+const base=[
+{id:'q1',stem:'A court acts without subject-matter jurisdiction. Which statement best reflects the orthodox procedural consequence?',opts:['The defect is cured by consent','The proceedings are liable to be treated as a nullity','The defect matters only on appeal','The defendant must first admit the claim'],correct:1,exp:'Subject-matter jurisdiction is foundational; parties cannot confer it by consent.'},
+{id:'q2',stem:'During strict examination mode, when should correctness and explanations first become visible?',opts:['Immediately after each answer','After every five questions','Only after final submission or time expiry','Whenever a question is flagged'],correct:2,exp:'The platform deliberately withholds feedback during the attempt.'},
+{id:'q3',stem:'Which product control most directly captures a dangerous misconception?',opts:['Study streak','Confidently wrong classification','Dark mode','Question bookmark count'],correct:1,exp:'A confidently wrong answer identifies an incorrect belief rather than a mere guess.'}
+];
+export default function Practice(){
+ const {course}=useLocalSearchParams(); const [answers,setAnswers]=useState<Record<string,number>>({}); const [flag,setFlag]=useState<Record<string,boolean>>({}); const [submitted,setSubmitted]=useState(false);
+ const qs=useMemo(()=>base.map(q=>({...q,opts:[...q.opts]})),[]);
+ const submit=()=>{const unanswered=qs.filter(q=>answers[q.id]===undefined).length;if(unanswered){Alert.alert('Review before submission',`You have ${unanswered} unanswered question(s). Submit anyway?`,[{text:'Cancel'},{text:'Submit',onPress:()=>setSubmitted(true)}]);}else setSubmitted(true)};
+ const score=qs.reduce((n,q)=>n+(answers[q.id]===q.correct?1:0),0);
+ return <ScrollView contentContainerStyle={s.page}><Text style={s.title}>{course||'Mixed Practice'}</Text><Text style={s.note}>No correctness feedback is shown until final submission.</Text>
+ {qs.map((q,idx)=><View key={q.id} style={s.card}><View style={s.row}><Text style={s.qno}>Question {idx+1}</Text><Pressable onPress={()=>setFlag(f=>({...f,[q.id]:!f[q.id]}))}><Text>{flag[q.id]?'⚑ Flagged':'⚐ Flag'}</Text></Pressable></View><Text style={s.stem}>{q.stem}</Text>{q.opts.map((o,i)=><Pressable disabled={submitted} key={o} onPress={()=>setAnswers(a=>({...a,[q.id]:i}))} style={[s.opt,answers[q.id]===i&&s.selected]}><Text>{String.fromCharCode(65+i)}. {o}</Text></Pressable>)}{submitted&&<View style={s.review}><Text style={s.reviewTitle}>{answers[q.id]===q.correct?'Correct':'Incorrect'}</Text><Text>Correct answer: {String.fromCharCode(65+q.correct)}</Text><Text>{q.exp}</Text></View>}</View>)}
+ {!submitted?<Pressable style={s.primary} onPress={submit}><Text style={s.primaryText}>Send Report / Submit Exam</Text></Pressable>:<><View style={s.result}><Text style={s.resultText}>Score: {score}/{qs.length} ({Math.round(score/qs.length*100)}%)</Text></View><Pressable style={s.primary} onPress={()=>router.replace('/')}><Text style={s.primaryText}>Return to Dashboard</Text></Pressable></>}
+ </ScrollView>
+}
+const s=StyleSheet.create({page:{padding:20,gap:16},title:{fontSize:26,fontWeight:'800'},note:{opacity:.7},card:{padding:18,borderWidth:1,borderColor:'#ddd',borderRadius:14,gap:10},row:{flexDirection:'row',justifyContent:'space-between'},qno:{fontWeight:'700'},stem:{fontSize:17,lineHeight:24},opt:{padding:13,borderWidth:1,borderColor:'#ddd',borderRadius:10},selected:{borderWidth:2},review:{padding:12,borderRadius:10,backgroundColor:'#f3f3f3',gap:4},reviewTitle:{fontWeight:'800'},primary:{padding:16,borderRadius:12,backgroundColor:'#111'},primaryText:{color:'#fff',fontWeight:'700',textAlign:'center'},result:{padding:18,borderWidth:1,borderRadius:12,borderColor:'#bbb'},resultText:{fontSize:20,fontWeight:'800'}});
