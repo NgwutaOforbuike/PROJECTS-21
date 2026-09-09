@@ -64,14 +64,14 @@ function App(){
     <div className="panel riskCard">
       <div className="panelHead"><div><span>RISK GOVERNOR</span><h3>NG · US · UK ONLY</h3></div><ShieldCheck className="shield"/></div>
       <div className="riskRing"><div><b>63</b><span>Risk utilisation</span></div></div>
-      <div className="riskRows"><p><span>Max drawdown</span><b>0.0% / 12%</b></p><p><span>1-day VaR</span><b>1.7%</b></p><p><span>Largest position</span><b>0.0% / 10%</b></p><p><span>Leverage</span><b>OFF</b></p></div>
+      <div className="riskRows"><p><span>Risk per trade</span><b>0.5% HARD MAX</b></p><p><span>Max drawdown</span><b>0.0% / 12%</b></p><p><span>Largest position</span><b>0.0% / 10%</b></p><p><span>Leverage</span><b>OFF</b></p></div>
       <button className="danger">Emergency kill switch</button>
     </div>
    </section>
 
    <section className="sectionTitle"><div><p className="eyebrow">CAPITAL ALLOCATION ENGINE</p><h2>Nigeria · USA · UK Opportunity Map</h2></div><button className="link">Open full scanner <ChevronRight/></button></section>
    <section className="panel tablePanel">
-    <div className="filters"><span className="selected">Allowed markets</span><span>Nigeria</span><span>USA</span><span>UK</span><span>Fractional assets</span><span>15% target hurdle</span></div>
+    <div className="filters"><span className="selected">Allowed markets</span><span>Nigeria</span><span>USA</span><span>UK</span><span>Fractional assets</span><span>5% target hurdle</span></div>
     <div className="table">
       <div className="tr th"><span>Asset</span><span>Class / Region</span><span>AI Score</span><span>1D</span><span>Risk</span><span>Committee</span><span>Decision</span></div>
       {opportunities.map(o=><div className="tr" key={o.asset}><span className="asset"><b>{o.asset}</b><small>{o.name}</small></span><span><b>{o.cls}</b><small>{o.region}</small></span><span className="score"><b>{o.score}</b><i style={{width:`${o.score}%`}}></i></span><span className={o.ret>=0?"positive":"negative"}>{pct(o.ret)}</span><span>{o.risk}</span><span>{o.committee}</span><span className={o.decision.includes("BUY")?"pill buy":"pill watch"}>{o.decision}</span></div>)}
@@ -81,13 +81,13 @@ function App(){
    <section className="lowerGrid">
     <div className="panel committee">
       <div className="panelHead"><div><span>AI INVESTMENT COMMITTEE</span><h3>Next qualifying proposal</h3></div><Sparkles/></div>
-      <p className="thesis">No trade is pre-approved. The system must first find an allowed-market candidate whose modelled paper return clears the 15% daily target hurdle and all risk checks.</p>
+      <p className="thesis">Daily mandate: rank every allowed-market candidate and surface the best qualifying setup with an entry zone, stop-loss, target, exit triggers and confidence. If nothing clears the 5% modelled return hurdle while keeping risk at or below 0.5% of equity, the correct recommendation is NO TRADE.</p>
       <div className="votes">{votes.map(v=><div className="vote" key={v.name}><span>{v.name}</span><b>{v.vote}</b><div><i style={{width:`${v.confidence}%`}}></i></div><small>{v.detail}</small></div>)}</div>
-      <div className="proposal"><div><span>Starting equity</span><b>$150</b></div><div><span>Target hurdle</span><b>15% / day</b></div><div><span>Markets</span><b>NG · US · UK</b></div><div><span>Execution</span><b>Paper only</b></div><button>Await qualifying setup</button></div>
+      <div className="proposal"><div><span>Starting equity</span><b>$150</b></div><div><span>Min target</span><b>5%+ / day</b></div><div><span>Max risk / trade</span><b>0.5%</b></div><div><span>Markets</span><b>NG · US · UK</b></div><button>Find today's best setup</button></div>
     </div>
     <div className="panel stress">
       <div className="panelHead"><div><span>STRESS ENGINE</span><h3>Portfolio scenarios</h3></div><Activity/></div>
-      <div className="scenario"><span>Global equities -15%</span><b>-7.8%</b><i><u style={{width:"78%"}}></u></i></div>
+      <div className="scenario"><span>Global equities -5%</span><b>-7.8%</b><i><u style={{width:"78%"}}></u></i></div>
       <div className="scenario"><span>USD +10%</span><b>-2.1%</b><i><u style={{width:"21%"}}></u></i></div>
       <div className="scenario"><span>Oil -20%</span><b>-1.4%</b><i><u style={{width:"14%"}}></u></i></div>
       <div className="scenario"><span>Rates +200bp</span><b>-3.6%</b><i><u style={{width:"36%"}}></u></i></div>
