@@ -33,3 +33,13 @@ def test_hurdle_classifier_trains():
     assert r.winner_name
     assert 0<=r.test.roc_auc<=1
     assert r.test.observations>0
+
+
+def test_future_unavailable_labels_stay_unknown():
+    from app.dataset_builder import add_forward_return_labels, add_hurdle_label
+    x=volatile_market(30)
+    y=add_forward_return_labels(x,(1,))
+    z=add_hurdle_label(x,horizon=3,hurdle_pct=5)
+    assert pd.isna(y["target_return_1d"].iloc[-1])
+    assert pd.isna(y["target_up_1d"].iloc[-1])
+    assert z["target_hit_5pct_3d"].iloc[-3:].isna().all()
