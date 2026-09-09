@@ -3,10 +3,15 @@
     "name":"NLS Bar Finals",
     "slug":"nls-bar-finals",
     "scheme":"nlsbar",
-    "version":"1.0.0",
+    "version":"1.1.0",
     "orientation":"portrait",
     "platforms":["android"],
-    "android":{"package":"com.oforbuike.nlsbarfinals","versionCode":1},
+    "userInterfaceStyle":"light",
+    "android":{
+      "package":"com.oforbuike.nlsbarfinals",
+      "versionCode":2,
+      "adaptiveIcon":{"backgroundColor":"#101828"}
+    },
     "plugins":[
       "expo-router",
       ["expo-build-properties",{"android":{"compileSdkVersion":36,"targetSdkVersion":36,"buildToolsVersion":"36.0.0"}}]
