@@ -22,6 +22,15 @@ class InvestmentContext(BaseModel):
     regulatory: dict[str,float|int|str|bool|None] = {}
     accounting: dict[str,float|int|str|bool|None] = {}
     alternative: dict[str,float|int|str|bool|None] = {}
+    corporate_actions: dict[str,float|int|str|bool|None] = {}
+    factors: dict[str,float|int|str|bool|None] = {}
+    crowding: dict[str,float|int|str|bool|None] = {}
+    tax: dict[str,float|int|str|bool|None] = {}
+    management: dict[str,float|int|str|bool|None] = {}
+    supply_chain: dict[str,float|int|str|bool|None] = {}
+    geopolitical: dict[str,float|int|str|bool|None] = {}
+    dividends: dict[str,float|int|str|bool|None] = {}
+    capital_structure: dict[str,float|int|str|bool|None] = {}
     metadata: dict[str,str|float|int|bool|None] = {}
 
 
