@@ -6,6 +6,8 @@ import { scoreMarket } from "./strategy.js";
 import { evaluateRisk } from "./risk.js";
 import { PaperBroker } from "./paperBroker.js";
 import { providerRoadmap } from "./providers.js";
+import { marketDataSources } from "./marketDataSources.js";
+import { buildConsensus, MarketObservation } from "./dataFusion.js";
 
 const app=Fastify({logger:true});
 await app.register(cors,{origin:true});
@@ -37,6 +39,35 @@ app.get("/health",async()=>({ok:true,service:"global-wealth-trading-os"}));
 app.get("/portfolio",async()=>portfolio);
 app.get("/risk-limits",async()=>limits);
 app.get("/providers",async()=>providerRoadmap);
+app.get("/market-data/sources",async()=>({
+  total:marketDataSources.length,
+  tiers:{
+    primary:marketDataSources.filter(s=>s.tier===1).length,
+    broker:marketDataSources.filter(s=>s.tier===2).length,
+    aggregator:marketDataSources.filter(s=>s.tier===3).length,
+    fallback:marketDataSources.filter(s=>s.tier===4).length
+  },
+  sources:marketDataSources
+}));
+app.post<{Body:{observations:MarketObservation[];maxAgeMs?:number;maxDispersionPct?:number;minimumIndependentSources?:number}}>("/market-data/consensus",async(req)=>{
+  return buildConsensus(req.body.observations,{
+    maxAgeMs:req.body.maxAgeMs ?? 15000,
+    maxDispersionPct:req.body.maxDispersionPct ?? 0.35,
+    minimumIndependentSources:req.body.minimumIndependentSources ?? 2
+  });
+});
+app.get("/market-data/health",async()=>({
+  status:"CONFIGURED_NOT_FULLY_ENTITLED",
+  policy:{
+    executionQuoteRequires:["fresh observation","non-delayed feed","confidence >= 70","at least 2 independent sources when available"],
+    primarySourcePreferred:true,
+    staleFeedQuarantine:true,
+    conflictQuarantine:true
+  },
+  activePublicSources:marketDataSources.filter(s=>s.access==="PUBLIC").map(s=>s.id),
+  credentialedSources:marketDataSources.filter(s=>["API_KEY","BROKER_ACCOUNT"].includes(s.access)).map(s=>s.id),
+  licensedSources:marketDataSources.filter(s=>s.access==="LICENSED").map(s=>s.id)
+}));
 app.get("/institutional-capabilities",async()=>({
   marketIntelligence:["multi-market scanner","real-time watchlists","news and research ingestion","technical/fundamental signals","market breadth","liquidity and spread monitoring"],
   portfolioAnalytics:["intraday P&L","performance attribution","factor/sector/country/currency exposures","concentration","cash utilisation","correlation matrix"],
