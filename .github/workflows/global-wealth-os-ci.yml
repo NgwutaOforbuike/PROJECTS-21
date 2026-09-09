@@ -19,6 +19,7 @@ jobs:
         run: |
           npm install
           npm run build
+          npm test
       - name: Build Web
         working-directory: global-wealth-trading-os/web
         run: |
