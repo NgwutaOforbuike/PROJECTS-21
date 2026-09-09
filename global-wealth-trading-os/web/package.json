@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck:api": "tsc -p tsconfig.api.json --noEmit"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -16,5 +17,7 @@
     "react-dom": "^19.1.1",
     "lucide-react": "^0.468.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  }
 }
