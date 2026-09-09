@@ -45,19 +45,32 @@ jobs:
           test "$TOTAL" -ge 10000
 
       - name: Select 10000 complete filings
-        shell: bash
         run: |
-          find sec_all -type f -name '10-K_*.md' -printf '%s %p\n'             | sort -n             | head -n 10000             | cut -d' ' -f2- > selected_files.txt
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
 
-          COUNT=$(wc -l < selected_files.txt)
-          echo "Selected complete filings: $COUNT"
-          test "$COUNT" -eq 10000
+          src = Path("sec_all")
+          dst = Path("sec_selected")
+          files = sorted(
+              src.rglob("10-K_*.md"),
+              key=lambda p: (p.stat().st_size, str(p))
+          )
+          selected = files[:10000]
+          assert len(selected) == 10000, f"Expected 10000, got {len(selected)}"
 
-          while IFS= read -r f; do
-            rel="${f#sec_all/}"
-            mkdir -p "sec_selected/$(dirname "$rel")"
-            cp "$f" "sec_selected/$rel"
-          done < selected_files.txt
+          with open("selected_files.txt", "w", encoding="utf-8") as out:
+              for p in selected:
+                  rel = p.relative_to(src)
+                  target = dst / rel
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(p, target)
+                  out.write(str(rel) + "\n")
+
+          count = sum(1 for _ in dst.rglob("10-K_*.md"))
+          print(f"Selected complete filings: {count}")
+          assert count == 10000
+          PY
 
       - name: Build acquisition and integrity manifests
         shell: bash
