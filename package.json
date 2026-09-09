@@ -1,0 +1,7 @@
+{
+  "name": "projects-21-vercel-entry",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix global-wealth-trading-os/web install --include=dev && npm --prefix global-wealth-trading-os/web run build"
+  }
+}
