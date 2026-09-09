@@ -18,11 +18,44 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Reject obvious committed secrets
-        shell: bash
         run: |
-          set -euo pipefail
-          ! git grep -nE '(BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|sk-[A-Za-z0-9_-]{20,}|api[_-]?key[[:space:]]*=[[:space:]]*["'"'][^$][^"'"']{8,}|password[[:space:]]*=[[:space:]]*["'"'][^$][^"'"']{8,})' -- ':!*.example' ':!*.md'
+          python - <<'PY'
+          from pathlib import Path
+          import re, sys
+
+          patterns = [
+              re.compile(r"BEGIN (?:RSA|EC|OPENSSH) PRIVATE KEY"),
+              re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
+              re.compile(r"(?i)\b(?:api[_-]?key|password|secret|token)\s*=\s*['\"][^$'{][^'\"]{7,}['\"]"),
+          ]
+          ignored_suffixes = {".md", ".example"}
+          ignored_parts = {".git", "node_modules", "__pycache__", "dist", ".venv"}
+          hits = []
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+              if any(part in ignored_parts for part in path.parts):
+                  continue
+              if path.suffix in ignored_suffixes or path.name.endswith(".env.example"):
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except Exception:
+                  continue
+              for lineno, line in enumerate(text.splitlines(), 1):
+                  if any(p.search(line) for p in patterns):
+                      hits.append(f"{path}:{lineno}")
+          if hits:
+              print("Potential committed secrets detected:")
+              print("\n".join(hits))
+              sys.exit(1)
+          print("No obvious committed secrets detected.")
+          PY
 
       - uses: actions/setup-node@v4
         with:
@@ -39,10 +72,6 @@ jobs:
         run: |
           npm install
           npm audit --audit-level=high
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
 
       - name: Audit Python dependencies
         working-directory: global-wealth-trading-os/python_ai
