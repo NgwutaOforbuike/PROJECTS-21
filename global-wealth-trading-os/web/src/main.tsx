@@ -132,6 +132,24 @@ function App(){
     </div>
    </section>
 
+   <section className="sectionTitle"><div><p className="eyebrow">CONTINUOUS LEARNING & MODEL GOVERNANCE</p><h2>Data → Training → Challenger → Champion → Inference</h2></div></section>
+   <section className="panel tablePanel">
+    <div className="table">
+      <div className="tr th"><span>Learning Control</span><span>Purpose</span><span>Status</span><span>Protection</span><span></span><span></span><span></span></div>
+      {[
+        ["Dataset Lineage","Source IDs, date range, feature/label versions and dataset SHA-256","ACTIVE","Provenance required"],
+        ["Temporal Leakage Guard","Blocks target/future contamination and overlapping time splits","ACTIVE","Chronological only"],
+        ["Return Model Training","Ridge, Random Forest, Extra Trees and Gradient Boosting challengers","ACTIVE","Held-out test set"],
+        ["5% Hurdle Model","Estimates probability of clearing the configured return hurdle","ACTIVE","Separate classifier"],
+        ["Champion / Challenger","Only validated improvements replace the current champion","ACTIVE","Promotion gate"],
+        ["Artifact Integrity","Saved models verified by SHA-256 before inference","ACTIVE","Tamper detection"],
+        ["Retraining Policy","Model age, new clean observations and drift can trigger retraining","ACTIVE","No blind retraining"],
+        ["Champion Inference","Current approved model enriches expected-return estimates","ACTIVE","Feature-version checked"],
+        ["Continuous Learning Cycle","Retrain-if-needed → forecast → audit → outcome calibration","ACTIVE","Live execution remains locked"]
+      ].map((r:any)=><div className="tr" key={r[0]}><span className="asset"><b>{r[0]}</b></span><span>{r[1]}</span><span className="pill buy">{r[2]}</span><span>{r[3]}</span><span></span><span></span><span></span></div>)}
+    </div>
+   </section>
+
    <section className="lowerGrid">
     <div className="panel committee">
       <div className="panelHead"><div><span>AI INVESTMENT COMMITTEE</span><h3>Next qualifying proposal</h3></div><Sparkles/></div>
