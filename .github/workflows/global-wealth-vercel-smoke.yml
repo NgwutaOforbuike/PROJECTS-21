@@ -4,24 +4,60 @@ on:
   push:
     branches:
       - global-wealth-trading-os
+    paths-ignore:
+      - diagnostics/vercel-auth.txt
+
+permissions:
+  contents: write
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for production deployment and verify auth configuration
+      - uses: actions/checkout@v4
+        with:
+          ref: global-wealth-trading-os
+
+      - name: Wait for deployment and capture auth diagnostic
+        id: probe
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           URL="https://global-wealth-trading-os-oforbuikengwuta-5194.vercel.app/api/auth/session"
-          for i in $(seq 1 24); do
-            BODY="$(curl -fsS --max-time 20 "$URL" 2>/dev/null || true)"
-            echo "Attempt $i: $BODY"
-            if echo "$BODY" | grep -q '"configured":true'; then
-              echo "Production auth configuration is available."
-              exit 0
+          mkdir -p diagnostics
+          LAST=""
+          CODE=""
+          OK="false"
+          for i in $(seq 1 12); do
+            TMP="$(mktemp)"
+            CODE="$(curl -sS -o "$TMP" -w "%{http_code}" --max-time 20 "$URL" || true)"
+            LAST="$(cat "$TMP" 2>/dev/null || true)"
+            rm -f "$TMP"
+            echo "Attempt $i HTTP $CODE: $LAST"
+            if [ "$CODE" = "200" ] && echo "$LAST" | grep -q '"configured":true'; then
+              OK="true"
+              break
             fi
-            sleep 15
+            sleep 10
           done
-          echo "Production endpoint never reported configured=true."
-          exit 1
+          {
+            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "url=$URL"
+            echo "http_code=$CODE"
+            echo "body=$LAST"
+            echo "configured_ok=$OK"
+          } > diagnostics/vercel-auth.txt
+          echo "ok=$OK" >> "$GITHUB_OUTPUT"
+
+      - name: Commit diagnostic result
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/vercel-auth.txt
+          git commit -m "record Vercel auth diagnostic" || exit 0
+          git push origin HEAD:global-wealth-trading-os
+
+      - name: Fail if auth is not ready
+        if: steps.probe.outputs.ok != 'true'
+        run: exit 1
