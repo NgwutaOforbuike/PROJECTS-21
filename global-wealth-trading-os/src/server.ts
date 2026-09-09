@@ -37,6 +37,14 @@ app.get("/health",async()=>({ok:true,service:"global-wealth-trading-os"}));
 app.get("/portfolio",async()=>portfolio);
 app.get("/risk-limits",async()=>limits);
 app.get("/providers",async()=>providerRoadmap);
+app.get("/institutional-capabilities",async()=>({
+  marketIntelligence:["multi-market scanner","real-time watchlists","news and research ingestion","technical/fundamental signals","market breadth","liquidity and spread monitoring"],
+  portfolioAnalytics:["intraday P&L","performance attribution","factor/sector/country/currency exposures","concentration","cash utilisation","correlation matrix"],
+  risk:["pre-trade checks","VaR/CVaR","drawdown controls","stress tests","scenario analysis","what-if portfolio","beta/factor risk","liquidity risk"],
+  execution:["limit/stop/stop-limit","bracket orders","conditional orders","VWAP/TWAP/POV adapters","smart-routing hooks","slippage tracking","fill-quality analytics"],
+  governance:["audit journal","mandate monitoring","exception alerts","kill switch","owner approval","strategy versioning"],
+  research:["thesis notebook","catalyst calendar","earnings/events","macro calendar","sentiment overlays","post-trade review"]
+}));
 app.get("/proposals",async()=>Array.from(proposals.values()));
 app.get("/paper/fills",async()=>paper.fills);
 
