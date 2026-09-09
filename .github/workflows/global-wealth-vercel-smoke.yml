@@ -1,0 +1,27 @@
+name: Global Wealth Vercel Smoke Test
+
+on:
+  push:
+    branches:
+      - global-wealth-trading-os
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for production deployment and verify auth configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://global-wealth-trading-os-oforbuikengwuta-5194.vercel.app/api/auth/session"
+          for i in $(seq 1 24); do
+            BODY="$(curl -fsS --max-time 20 "$URL" 2>/dev/null || true)"
+            echo "Attempt $i: $BODY"
+            if echo "$BODY" | grep -q '"configured":true'; then
+              echo "Production auth configuration is available."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Production endpoint never reported configured=true."
+          exit 1
