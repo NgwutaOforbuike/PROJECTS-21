@@ -20,7 +20,7 @@ def volatile_market(n=520):
 
 def test_backward_asof_prevents_future_join():
     mi=pd.date_range("2026-01-01",periods=3,freq="D",tz="UTC")
-    ei=pd.to_datetime(["2025-12-31","2026-01-02 12:00"],utc=True)
+    ei=pd.to_datetime(["2025-12-31T00:00:00Z","2026-01-02T12:00:00Z"],utc=True)
     market=pd.DataFrame({"close":[1,2,3]},index=mi)
     exo=pd.DataFrame({"macro":[10,99]},index=ei)
     x=asof_join_features(market,exo,suffix="m")
