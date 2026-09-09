@@ -6,6 +6,7 @@ import { scoreMarket } from "./strategy.js";
 import { evaluateRisk } from "./risk.js";
 import { PaperBroker } from "./paperBroker.js";
 import { providerRoadmap } from "./providers.js";
+import { AIServiceClient } from "./aiClient.js";
 import { marketDataSources } from "./marketDataSources.js";
 import { buildConsensus, MarketObservation } from "./dataFusion.js";
 
@@ -34,8 +35,24 @@ const limits:RiskLimits={
 
 const proposals=new Map<string,TradeProposal>();
 const paper=new PaperBroker();
+const ai=new AIServiceClient();
 
 app.get("/health",async()=>({ok:true,service:"global-wealth-trading-os"}));
+app.get("/ai/health",async(req,reply)=>{
+  try{return await ai.health();}catch(error){return reply.code(503).send({ok:false,error:String(error)});}
+});
+app.get("/ai/capabilities",async(req,reply)=>{
+  try{return await ai.capabilities();}catch(error){return reply.code(503).send({error:String(error)});}
+});
+app.get("/ai/mandate",async(req,reply)=>{
+  try{return await ai.mandate();}catch(error){return reply.code(503).send({error:String(error)});}
+});
+app.post<{Body:unknown}>("/ai/daily-cycle",async(req,reply)=>{
+  try{return await ai.dailyCycle(req.body);}catch(error){return reply.code(503).send({error:String(error)});}
+});
+app.post<{Body:unknown}>("/ai/monte-carlo",async(req,reply)=>{
+  try{return await ai.monteCarlo(req.body);}catch(error){return reply.code(503).send({error:String(error)});}
+});
 app.get("/portfolio",async()=>portfolio);
 app.get("/risk-limits",async()=>limits);
 app.get("/providers",async()=>providerRoadmap);
