@@ -7,6 +7,7 @@ from statistics import mean
 from .agent_context import InvestmentContext
 from .models import AgentOpinion
 from .specialist_agents import SPECIALIST_AGENTS,SpecialistAgent
+from .advanced_specialist_agents import ADVANCED_AGENTS
 
 
 @dataclass
@@ -26,7 +27,7 @@ VETO_AGENTS={"regulatory","accounting_forensics","liquidity_microstructure","exe
 
 class ExpertInvestmentCommittee:
     def __init__(self,agents:list[SpecialistAgent]|None=None)->None:
-        self.agents=agents or SPECIALIST_AGENTS
+        self.agents=agents or (SPECIALIST_AGENTS+ADVANCED_AGENTS)
 
     async def evaluate(self,ctx:InvestmentContext)->ExpertCommitteeResult:
         opinions=await asyncio.gather(*(a.evaluate(ctx) for a in self.agents))
