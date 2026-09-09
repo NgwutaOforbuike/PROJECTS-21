@@ -1,0 +1,35 @@
+services:
+  ai:
+    build: ./python_ai
+    environment:
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-GlobalWealthOS research contact@example.com}
+      - FRED_API_KEY=${FRED_API_KEY:-}
+      - BEA_API_KEY=${BEA_API_KEY:-}
+      - BLS_REGISTRATION_KEY=${BLS_REGISTRATION_KEY:-}
+      - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-}
+    volumes:
+      - wealth_ai_data:/app/data
+    ports:
+      - "8000:8000"
+
+  api:
+    build: .
+    environment:
+      - PORT=8787
+      - PYTHON_AI_URL=http://ai:8000
+    depends_on:
+      - ai
+    ports:
+      - "8787:8787"
+
+  web:
+    image: node:22-slim
+    working_dir: /web
+    volumes:
+      - ./web:/web
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+
+volumes:
+  wealth_ai_data:
