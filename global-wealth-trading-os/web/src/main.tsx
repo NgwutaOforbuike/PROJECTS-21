@@ -32,9 +32,11 @@ function App(){
     <button><Globe2/>Opportunity Map</button>
     <button><BrainCircuit/>AI Committee</button>
     <button><LineChart/>Strategy Lab</button>
+    <button><Activity/>Market Depth & Flow</button>
     <button><ShieldCheck/>Risk Cockpit</button>
     <button><WalletCards/>Portfolio</button>
-    <button><Landmark/>Execution</button>
+    <button><Landmark/>Execution & Orders</button>
+    <button><BarChart3/>Performance Attribution</button>
    </nav>
    <div className="guard"><LockKeyhole/><div><b>Live execution locked</b><span>Paper mode · owner approval required</span></div></div>
   </aside>
@@ -75,6 +77,23 @@ function App(){
     <div className="table">
       <div className="tr th"><span>Asset</span><span>Class / Region</span><span>AI Score</span><span>1D</span><span>Risk</span><span>Committee</span><span>Decision</span></div>
       {opportunities.map(o=><div className="tr" key={o.asset}><span className="asset"><b>{o.asset}</b><small>{o.name}</small></span><span><b>{o.cls}</b><small>{o.region}</small></span><span className="score"><b>{o.score}</b><i style={{width:`${o.score}%`}}></i></span><span className={o.ret>=0?"positive":"negative"}>{pct(o.ret)}</span><span>{o.risk}</span><span>{o.committee}</span><span className={o.decision.includes("BUY")?"pill buy":"pill watch"}>{o.decision}</span></div>)}
+    </div>
+   </section>
+
+   <section className="sectionTitle"><div><p className="eyebrow">INSTITUTIONAL TOOLKIT</p><h2>Desk-grade analytics and execution controls</h2></div></section>
+   <section className="panel tablePanel">
+    <div className="table">
+      <div className="tr th"><span>Module</span><span>What it adds</span><span>Why it matters</span><span>Status</span><span></span><span></span><span></span></div>
+      {[
+        ["Market Depth & Flow","Bid/ask depth, spreads, volume, liquidity","Avoid poor fills and thin markets","PLANNED"],
+        ["Advanced Orders","Bracket, conditional, VWAP/TWAP/POV adapters","Control entry/exit and execution quality","CORE READY"],
+        ["Factor Risk","Beta, sector, country, currency and factor exposures","See hidden portfolio concentration","PLANNED"],
+        ["Performance Attribution","P&L by asset, signal, strategy and market","Know exactly what creates or destroys returns","PLANNED"],
+        ["What-If Portfolio","Hypothetical add/reduce/exit before execution","Preview portfolio impact before trading","PLANNED"],
+        ["Catalyst Calendar","Earnings, macro releases, dividends, corporate actions","Time entries around material events","PLANNED"],
+        ["Execution Analytics","Slippage, fill quality, spread cost, venue quality","Measure whether execution helps or hurts alpha","PLANNED"],
+        ["Research Notebook","Thesis, catalysts, invalidation and post-trade review","Make every trade auditable and learnable","PLANNED"]
+      ].map((r:any)=><div className="tr" key={r[0]}><span className="asset"><b>{r[0]}</b></span><span>{r[1]}</span><span>{r[2]}</span><span className="pill watch">{r[3]}</span><span></span><span></span><span></span></div>)}
     </div>
    </section>
 
