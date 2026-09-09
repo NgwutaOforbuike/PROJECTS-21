@@ -97,6 +97,23 @@ function App(){
     </div>
    </section>
 
+   <section className="sectionTitle"><div><p className="eyebrow">MARKET DATA FABRIC</p><h2>Primary feeds + independent validation + fallback</h2></div></section>
+   <section className="panel tablePanel">
+    <div className="filters"><span className="selected">Tier 1 Primary</span><span>Tier 2 Broker</span><span>Tier 3 Aggregators</span><span>Tier 4 Fallback</span><span>Consensus required</span></div>
+    <div className="table">
+      <div className="tr th"><span>Source</span><span>Region</span><span>Role</span><span>Access</span><span>Status</span><span></span><span></span></div>
+      {[
+        ["NGX / FMDQ / CBN / NBS / DMO","Nigeria","Primary exchange + macro + fixed income","Official / licensed","CONFIGURED"],
+        ["NYSE / Nasdaq / SEC / FINRA / Fed / BLS / BEA","USA","Primary venue + filings + macro","Official / licensed","CONFIGURED"],
+        ["LSE / BoE / ONS / Companies House / FCA","UK","Primary venue + filings + macro","Official / licensed","CONFIGURED"],
+        ["IBKR / Alpaca","US · UK · Global","Broker data + market depth + history","Credentials","ADAPTER READY"],
+        ["Databento / Massive / Twelve Data / Tiingo / Finnhub / Alpha Vantage","Cross-market","Redundancy + history + enrichment","API keys","ADAPTER READY"],
+        ["Stooq / Yahoo fallback","Cross-market","Discovery only; never execution authority","Public/web","FALLBACK ONLY"]
+      ].map((r:any)=><div className="tr" key={r[0]}><span className="asset"><b>{r[0]}</b></span><span>{r[1]}</span><span>{r[2]}</span><span>{r[3]}</span><span className="pill watch">{r[4]}</span><span></span><span></span></div>)}
+    </div>
+    <div className="thesis">Execution-price policy: prefer primary feeds, reject stale/delayed observations, cross-check independent sources when available, quarantine conflicts, and attach provenance + confidence to every price used by the decision engine.</div>
+   </section>
+
    <section className="lowerGrid">
     <div className="panel committee">
       <div className="panelHead"><div><span>AI INVESTMENT COMMITTEE</span><h3>Next qualifying proposal</h3></div><Sparkles/></div>
