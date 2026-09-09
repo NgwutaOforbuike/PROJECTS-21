@@ -1,0 +1,47 @@
+name: Build NLS Bar Finals APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nls-bar-apk/**'
+      - '.github/workflows/nls-apk-main.yml'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Install dependencies
+        working-directory: nls-bar-apk
+        run: npm install
+      - name: Align Expo dependencies
+        working-directory: nls-bar-apk
+        run: npx expo install --fix
+      - name: Generate Android project
+        working-directory: nls-bar-apk
+        run: npx expo prebuild --platform android --non-interactive
+      - name: Build APK
+        working-directory: nls-bar-apk/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: |
+          mkdir -p output
+          cp nls-bar-apk/android/app/build/outputs/apk/debug/app-debug.apk output/NLS-Bar-Finals.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NLS-Bar-Finals-APK
+          path: output/NLS-Bar-Finals.apk
+          if-no-files-found: error
