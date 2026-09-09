@@ -2,6 +2,7 @@ import React from "react";
 import {createRoot} from "react-dom/client";
 import {Activity,BarChart3,Bell,BrainCircuit,ChevronRight,Globe2,Landmark,LineChart,LockKeyhole,Search,ShieldCheck,SlidersHorizontal,Sparkles,WalletCards} from "lucide-react";
 import "./styles.css";
+import {buildInfo} from "./buildInfo";
 
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n);
 const pct=(n:number)=>`${n>0?"+":""}${n.toFixed(2)}%`;
@@ -38,7 +39,7 @@ function App(){
     <button><Landmark/>Execution & Orders</button>
     <button><BarChart3/>Performance Attribution</button>
    </nav>
-   <div className="guard"><LockKeyhole/><div><b>Live execution locked</b><span>Paper mode · owner approval required</span></div></div>
+   <div className="guard"><LockKeyhole/><div><b>Live execution locked</b><span>Paper mode · owner approval required</span><span>{buildInfo.source}</span></div></div>
   </aside>
   <main>
    <header>
