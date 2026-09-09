@@ -1,0 +1,67 @@
+name: Global Wealth OS Live Visual
+
+on:
+  push:
+    branches: [global-wealth-trading-os]
+    paths:
+      - "global-wealth-trading-os/web/**"
+      - ".github/workflows/global-wealth-os-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: global-wealth-os-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install
+        working-directory: global-wealth-trading-os/web
+        run: npm install
+
+      - name: Build visual app from this commit
+        working-directory: global-wealth-trading-os/web
+        run: npm run build -- --base=/PROJECTS-21/
+
+      - name: Add deployment metadata
+        run: |
+          cat > global-wealth-trading-os/web/dist/build-meta.json <<EOF
+          {
+            "commit": "$GITHUB_SHA",
+            "branch": "$GITHUB_REF_NAME",
+            "workflow_run": "$GITHUB_RUN_ID"
+          }
+          EOF
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload exact built frontend
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: global-wealth-trading-os/web/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
