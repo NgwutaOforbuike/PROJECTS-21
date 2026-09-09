@@ -8,11 +8,9 @@ const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency
 const pct=(n:number)=>`${n>0?"+":""}${n.toFixed(2)}%`;
 
 const opportunities=[
-{asset:"NVDA",name:"NVIDIA",cls:"Equity",region:"US",score:92,ret:2.61,risk:"Medium",decision:"STRONG BUY",committee:"5–1",why:"Earnings momentum + liquidity + positive trend regime"},
-{asset:"BTC",name:"Bitcoin",cls:"Crypto",region:"Global",score:86,ret:1.48,risk:"High",decision:"BUY",committee:"4–2",why:"Trend persistence; risk governor limits sizing"},
-{asset:"GLD",name:"Gold ETF",cls:"ETF",region:"US",score:79,ret:.52,risk:"Low",decision:"BUY",committee:"5–1",why:"Diversifier under current macro stress basket"},
-{asset:"NESN",name:"Nestlé SA",cls:"Equity",region:"Europe",score:71,ret:-.16,risk:"Low",decision:"WATCH",committee:"3–3",why:"Quality high; momentum not yet confirmed"},
-{asset:"NGXBANK",name:"NGX Banking",cls:"Equity",region:"Nigeria",score:68,ret:.83,risk:"Medium",decision:"WATCH",committee:"4–2",why:"Valuation attractive; FX risk raises hurdle"}
+{asset:"NGX-SCAN",name:"Nigeria Qualified Universe",cls:"Multi-asset",region:"Nigeria",score:0,ret:0,risk:"Mandate gated",decision:"SCREEN",committee:"Pending live data",why:"Only candidates clearing data, liquidity, committee, 5% hurdle and 0.5% risk gate can qualify."},
+{asset:"US-SCAN",name:"United States Qualified Universe",cls:"Multi-asset",region:"USA",score:0,ret:0,risk:"Mandate gated",decision:"SCREEN",committee:"Pending live data",why:"Fractional sizing supported where broker/venue permits."},
+{asset:"UK-SCAN",name:"United Kingdom Qualified Universe",cls:"Multi-asset",region:"UK",score:0,ret:0,risk:"Mandate gated",decision:"SCREEN",committee:"Pending live data",why:"Official filings, macro evidence and market feeds feed the research engine."}
 ];
 
 const votes=[
@@ -51,8 +49,8 @@ function App(){
     <span><i className="up"></i>S&P 500 <b>6,548.31</b> <em>+0.42%</em></span>
     <span><i className="up"></i>NGX ASI <b>141,202</b> <em>+0.71%</em></span>
     <span><i className="down"></i>US 10Y <b>4.08%</b> <em>-3bp</em></span>
-    <span><i className="up"></i>BTC <b>$113,820</b> <em>+1.32%</em></span>
-    <span><i className="up"></i>Gold <b>$3,641</b> <em>+0.26%</em></span>
+    <span><i className="up"></i>UK 100 <b>LIVE FEED</b> <em>pending</em></span>
+    <span><i className="up"></i>System <b>GitHub Synced</b> <em>active</em></span>
    </section>
 
    <section className="heroGrid">
@@ -113,6 +111,25 @@ function App(){
       ].map((r:any)=><div className="tr" key={r[0]}><span className="asset"><b>{r[0]}</b></span><span>{r[1]}</span><span>{r[2]}</span><span>{r[3]}</span><span className="pill watch">{r[4]}</span><span></span><span></span></div>)}
     </div>
     <div className="thesis">Execution-price policy: prefer primary feeds, reject stale/delayed observations, cross-check independent sources when available, quarantine conflicts, and attach provenance + confidence to every price used by the decision engine.</div>
+   </section>
+
+   <section className="sectionTitle"><div><p className="eyebrow">AUTONOMOUS INTELLIGENCE CORE</p><h2>Implemented in Python + TypeScript</h2></div></section>
+   <section className="panel tablePanel">
+    <div className="table">
+      <div className="tr th"><span>Engine</span><span>Function</span><span>State</span><span>Safety</span><span></span><span></span><span></span></div>
+      {[
+        ["Knowledge Memory","Source-backed research, filings and outcome memory","ACTIVE","Auditable"],
+        ["Feature Engine","RSI, MACD, ATR, trend, volatility, volume and range features","ACTIVE","Data-quality gated"],
+        ["Forecast Ensemble","Ridge + Random Forest + Gradient Boosting","ACTIVE","Walk-forward validation"],
+        ["AI Investment Committee","Macro + Fundamental + Technical + Sentiment + Quant","ACTIVE","3+ buy votes required"],
+        ["Risk Governor","Position sizing, drawdown, liquidity, geography and hurdle checks","ACTIVE","0.5% max risk"],
+        ["Monte Carlo","Portfolio-path and drawdown simulation","ACTIVE","Pre-trade analysis"],
+        ["Strategy Registry","Draft → Backtest → Paper → Approved → Retired","ACTIVE","No auto-live promotion"],
+        ["Outcome Calibration","Prediction vs realised-return learning loop","ACTIVE","Validation before reweighting"],
+        ["Audit Ledger","Hash-chained decision and ingestion events","ACTIVE","Tamper-evident"],
+        ["Live Execution","Broker order transmission","LOCKED","Explicit owner gate"]
+      ].map((r:any)=><div className="tr" key={r[0]}><span className="asset"><b>{r[0]}</b></span><span>{r[1]}</span><span className={r[2]==="LOCKED"?"pill watch":"pill buy"}>{r[2]}</span><span>{r[3]}</span><span></span><span></span><span></span></div>)}
+    </div>
    </section>
 
    <section className="lowerGrid">
