@@ -1,10 +1,56 @@
-name: NLS APK Cloud Test
+name: Build NLS Bar Finals APK
+
 on:
   push:
     branches:
       - nls-bar-apk-build
+    paths:
+      - 'nls-bar-apk/**'
+      - '.github/workflows/nls-bar-apk.yml'
+  workflow_dispatch:
+
 jobs:
-  test:
+  android-apk:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nls-bar-apk
+
     steps:
-      - run: echo "GitHub runner is working"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: nls-bar-apk/package.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --non-interactive --clean
+
+      - name: Build installable APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk NLS-Bar-Finals.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NLS-Bar-Finals-Android
+          path: nls-bar-apk/NLS-Bar-Finals.apk
+          retention-days: 30
