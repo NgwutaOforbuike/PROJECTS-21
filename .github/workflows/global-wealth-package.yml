@@ -1,0 +1,56 @@
+name: Package Global Wealth AI OS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [global-wealth-trading-os]
+    paths:
+      - "global-wealth-trading-os/**"
+      - "SECURITY.md"
+      - ".gitignore"
+      - ".github/workflows/global-wealth-package.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build standalone project bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/GLOBAL-WEALTH-AI-OS
+          cp -R global-wealth-trading-os/. bundle/GLOBAL-WEALTH-AI-OS/
+          cp SECURITY.md bundle/GLOBAL-WEALTH-AI-OS/SECURITY.md
+          cp .gitignore bundle/GLOBAL-WEALTH-AI-OS/.gitignore
+          mkdir -p bundle/GLOBAL-WEALTH-AI-OS/.github/workflows
+          cp .github/workflows/global-wealth-os-ci.yml bundle/GLOBAL-WEALTH-AI-OS/.github/workflows/
+          cp .github/workflows/global-wealth-security.yml bundle/GLOBAL-WEALTH-AI-OS/.github/workflows/
+          cp .github/dependabot.yml bundle/GLOBAL-WEALTH-AI-OS/.github/dependabot.yml
+          cat > bundle/GLOBAL-WEALTH-AI-OS/PRIVATE-REPO-MIGRATION.md <<'EOF'
+          # Private repository migration
+
+          Intended repository name: GLOBAL-WEALTH-AI-OS
+
+          Required visibility: Private
+
+          Keep:
+          - all credentials in GitHub/Vercel secrets or environment variables;
+          - live execution locked;
+          - owner-only repository collaborators;
+          - Vercel Authentication enabled for production and preview deployments.
+
+          Never commit real credentials or broker secrets.
+          EOF
+
+      - name: Upload complete project
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLOBAL-WEALTH-AI-OS
+          path: bundle/GLOBAL-WEALTH-AI-OS
+          if-no-files-found: error
+          retention-days: 30
