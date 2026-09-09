@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /global-wealth-trading-os
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /global-wealth-trading-os/web
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /global-wealth-trading-os/python_ai
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
