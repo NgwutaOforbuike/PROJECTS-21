@@ -21,6 +21,7 @@ from .model_artifacts import ModelArtifactStore
 from .model_registry import ModelRegistry
 from .dataset_registry import DatasetRegistry
 from .retraining import should_retrain
+from .learning_cycle import LearningCycle
 
 app = FastAPI(title="Global Wealth AI", version="0.1.0")
 kb = KnowledgeBase()
@@ -32,6 +33,7 @@ training_service = TrainingService()
 model_artifacts = ModelArtifactStore()
 model_registry = ModelRegistry()
 dataset_registry = DatasetRegistry()
+learning_cycle_engine = LearningCycle(training=training_service)
 
 
 class DailyBestRequest(BaseModel):
@@ -270,6 +272,8 @@ async def system_capabilities() -> dict:
         "champion_challenger_registry": "ACTIVE",
         "artifact_hash_verification": "ACTIVE",
         "retraining_policy": "ACTIVE",
+        "champion_inference": "ACTIVE",
+        "continuous_learning_cycle": "ACTIVE",
         "live_execution": "LOCKED",
     }
 
@@ -500,3 +504,50 @@ async def retraining_check(req: RetrainingCheckRequest) -> dict:
         drift=drift,
     )
     return decision.__dict__
+
+
+class LearningCycleRequest(BaseModel):
+    instrument_id: str
+    region: str
+    source_ids: list[str]
+    observations: list[OHLCVPoint]
+    strategy_name: str = "daily-return"
+    version: str = "v1"
+    new_clean_observations: int | None = None
+
+
+@app.post("/learning/cycle")
+async def learning_cycle(req: LearningCycleRequest) -> dict:
+    if req.region not in {"NG","US","UK"}:
+        raise HTTPException(status_code=400, detail="region must be NG, US or UK")
+    if len(req.observations) < 160:
+        raise HTTPException(status_code=400, detail="at least 160 OHLCV observations are required")
+    if not req.source_ids:
+        raise HTTPException(status_code=400, detail="at least one source_id is required")
+    try:
+        import pandas as pd
+        frame=pd.DataFrame([o.model_dump() for o in req.observations])
+        frame["timestamp"]=pd.to_datetime(frame["timestamp"],utc=True,errors="raise")
+        frame=frame.set_index("timestamp").sort_index()
+        result=learning_cycle_engine.run(
+            frame[["open","high","low","close","volume"]],
+            instrument_id=req.instrument_id,
+            region=req.region,
+            source_ids=req.source_ids,
+            strategy_name=req.strategy_name,
+            version=req.version,
+            new_clean_observations=req.new_clean_observations,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Learning cycle failed: {exc}") from exc
+    payload={
+        "strategy_name":result.strategy_name,
+        "retrained":result.retrained,
+        "retraining_reasons":result.retraining_reasons,
+        "trained_model_id":result.trained_model_id,
+        "promoted_to_champion":result.promoted_to_champion,
+        "forecast":result.forecast.__dict__ if result.forecast else None,
+        "ran_at":result.ran_at,
+    }
+    audit.append("LEARNING_CYCLE","learning-engine",payload)
+    return payload
