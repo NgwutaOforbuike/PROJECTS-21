@@ -70,3 +70,13 @@ A recommendation is not considered decision-ready merely because an AI model lik
 7. auditability and reproducibility.
 
 Backtest and paper results may change model weighting or strategy status after validation, but may not loosen the owner's mandate.
+
+
+## Operational resilience
+- drift.py — detects material return/distribution regime drift.
+- transaction_costs.py — spread, market impact, commission and FX cost estimation.
+- reconciliation.py — expected-versus-actual position reconciliation.
+- alerts.py — critical/high/medium operational and risk alerts.
+- database.py — SQLAlchemy persistence for decisions, evidence and realised outcomes.
+
+These controls sit outside the forecasting models so a model cannot suppress its own risk, data-quality or reconciliation alarms.
