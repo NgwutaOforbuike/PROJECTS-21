@@ -18,13 +18,13 @@ jobs:
         working-directory: global-wealth-trading-os
         run: |
           npm install
-          npm run typecheck:api
           npm run build
           npm test
       - name: Build Web
         working-directory: global-wealth-trading-os/web
         run: |
           npm install
+          npm run typecheck:api
           npm run build
 
       - name: Set up Python
