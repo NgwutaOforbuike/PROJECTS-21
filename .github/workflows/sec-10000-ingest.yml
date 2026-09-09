@@ -1,0 +1,63 @@
+name: SEC 10000 Source Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/sec-10000-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Prepare workspace
+        run: |
+          mkdir -p sec_raw sec_selected
+      - name: Download official SEC submissions archive
+        run: |
+          curl -fL --retry 5 --retry-delay 5             -A "GlobalWealthAI Research https://github.com/NgwutaOforbuike/PROJECTS-21"             https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip             -o submissions.zip
+          test -s submissions.zip
+      - name: Extract archive
+        run: |
+          unzip -q submissions.zip -d sec_raw
+      - name: Select 10000 genuine source records
+        shell: bash
+        run: |
+          find sec_raw -type f -name '*.json' -printf '%s %p\n'             | sort -n             | head -n 10000             | cut -d' ' -f2- > selected_files.txt
+
+          COUNT=$(wc -l < selected_files.txt)
+          echo "Selected $COUNT files"
+          test "$COUNT" -ge 10000
+
+          while IFS= read -r f; do
+            cp --parents "$f" sec_selected/
+          done < selected_files.txt
+      - name: Build integrity manifest
+        shell: bash
+        run: |
+          cd sec_selected
+          find . -type f -name '*.json' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          COUNT=$(find . -type f -name '*.json' | wc -l)
+          {
+            echo "source=U.S. Securities and Exchange Commission EDGAR"
+            echo "source_url=https://www.sec.gov/Archives/edgar/daily-index/bulkdata/submissions.zip"
+            echo "acquired_json_documents=$COUNT"
+            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "selection=10000 smallest JSON records by byte size from current official submissions archive"
+          } > ACQUISITION_MANIFEST.txt
+          test "$COUNT" -ge 10000
+      - name: Package corpus
+        run: |
+          tar -czf sec_edgar_10000_source_documents.tar.gz -C sec_selected .
+          ls -lh sec_edgar_10000_source_documents.tar.gz
+      - name: Upload corpus artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-edgar-10000-source-documents
+          path: sec_edgar_10000_source_documents.tar.gz
+          retention-days: 1
+          compression-level: 0
