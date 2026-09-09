@@ -34,7 +34,7 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --non-interactive --clean
