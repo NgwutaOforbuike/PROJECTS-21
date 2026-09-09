@@ -30,7 +30,7 @@ jobs:
           OK="false"
           for i in $(seq 1 12); do
             TMP="$(mktemp)"
-            CODE="$(curl -sS -o "$TMP" -w "%{http_code}" --max-time 20 "$URL" || true)"
+            CODE="$(curl -L -sS -o "$TMP" -w "%{http_code}" --max-time 20 "$URL" || true)"
             LAST="$(cat "$TMP" 2>/dev/null || true)"
             rm -f "$TMP"
             echo "Attempt $i HTTP $CODE: $LAST"
