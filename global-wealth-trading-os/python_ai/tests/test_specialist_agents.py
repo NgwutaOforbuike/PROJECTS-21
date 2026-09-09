@@ -28,7 +28,7 @@ async def test_expert_committee_runs_all_specialists():
         metadata={"portfolio_correlation":.2,"sector_exposure_after_pct":20,"country_exposure_after_pct":30},
     )
     result=await ExpertInvestmentCommittee().evaluate(ctx)
-    assert len(result.opinions)>=16
+    assert len(result.opinions)>=28
     assert result.decision in {"BUY","WATCH","AVOID"}
 
 
