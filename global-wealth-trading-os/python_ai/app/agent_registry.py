@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from .specialist_agents import SPECIALIST_AGENTS
+from .advanced_specialist_agents import ADVANCED_AGENTS
 
 
 @dataclass(frozen=True)
@@ -28,12 +29,24 @@ _CATEGORIES={
     "portfolio_fit":"portfolio",
     "execution":"execution",
     "alternative_data":"research",
+    "factor_exposure":"factor",
+    "corporate_actions":"event",
+    "dividend":"fundamental",
+    "crowding_short_interest":"market",
+    "tax_friction":"execution",
+    "management_quality":"fundamental",
+    "supply_chain":"fundamental",
+    "geopolitical":"macro",
+    "capital_structure":"risk",
+    "trend_persistence":"technical",
+    "mean_reversion":"technical",
+    "tail_risk":"risk",
 }
-_VETO={"regulatory","accounting_forensics","liquidity_microstructure","execution","volatility"}
+_VETO={"regulatory","accounting_forensics","liquidity_microstructure","execution","volatility","tail_risk","capital_structure"}
 
 
 def descriptors()->list[AgentDescriptor]:
     return [
         AgentDescriptor(a.name,_CATEGORIES.get(a.name,"other"),a.name in _VETO)
-        for a in SPECIALIST_AGENTS
+        for a in (SPECIALIST_AGENTS+ADVANCED_AGENTS)
     ]
