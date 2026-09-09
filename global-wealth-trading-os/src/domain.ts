@@ -23,6 +23,7 @@ export interface MarketSnapshot {
   change20dPct: number;
   volatility20dPct: number;
   volumeScore: number;
+  expectedDailyReturnPct?: number;
   timestamp: string;
 }
 
@@ -59,6 +60,8 @@ export interface RiskLimits {
   maxVolatilityPct: number;
   allowLeverage: boolean;
   killSwitch: boolean;
+  allowedCountries: string[];
+  targetDailyReturnPct: number;
 }
 
 export interface TradeProposal {
