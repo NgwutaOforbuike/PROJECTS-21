@@ -20,11 +20,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Confirm Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
       - name: Install dependencies
         working-directory: nls-bar-apk
         run: npm install --legacy-peer-deps
