@@ -1,0 +1,153 @@
+name: NGX Issuer Registry and Listing-Year Coverage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ngx-issuer-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Build issuer registry from NGX public sources
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          import requests, urllib.parse, re, csv, json, time
+          from datetime import datetime
+
+          s=requests.Session()
+          s.headers.update({'Accept':'application/json;odata=verbose','User-Agent':'GlobalWealthAI/1.0 issuer intelligence archive'})
+          base="https://doclib.ngxgroup.com/_api/web/lists/getByTitle('XFinancial_News')/items/"
+          params={'$select':'ID,URL,Modified,Created,CompanyName,CompanySymbol,InternationSecIN,Type_of_Submission','$orderby':'ID asc','$top':'5000'}
+          url=base+'?'+urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
+          rows=[]; seen_urls=set()
+          while url:
+            r=s.get(url,timeout=90); r.raise_for_status(); d=r.json()['d']
+            for x in d.get('results',[]):
+              u=(x.get('URL') or {}).get('Url') if isinstance(x.get('URL'),dict) else None
+              if u and u not in seen_urls:
+                seen_urls.add(u); rows.append(x)
+            url=d.get('__next')
+
+          by_symbol={}
+          year_re=re.compile(r'(?<!\d)(19\d{2}|20\d{2})(?!\d)')
+          for x in rows:
+            sym=(x.get('CompanySymbol') or '').strip()
+            if not sym: continue
+            ent=by_symbol.setdefault(sym,{'symbol':sym,'names':{},'isins':{},'first_filing_year':None,'last_filing_year':None,'filing_count':0})
+            name=(x.get('CompanyName') or '').strip()
+            if name: ent['names'][name]=ent['names'].get(name,0)+1
+            isin=(x.get('InternationSecIN') or '').strip()
+            if isin: ent['isins'][isin]=ent['isins'].get(isin,0)+1
+            ent['filing_count']+=1
+            desc=(x.get('URL') or {}).get('Description') or ''
+            u=(x.get('URL') or {}).get('Url') or ''
+            cand=[]
+            for text in [desc,u]:
+              for m in year_re.findall(text):
+                y=int(m)
+                if 1900<=y<=2026: cand.append(y)
+            for dtkey in ['Created','Modified']:
+              v=x.get(dtkey)
+              if v:
+                try: cand.append(int(v[:4]))
+                except: pass
+            if cand:
+              y=min(cand)
+              ent['first_filing_year']=y if ent['first_filing_year'] is None else min(ent['first_filing_year'],y)
+              ent['last_filing_year']=max(cand) if ent['last_filing_year'] is None else max(ent['last_filing_year'],max(cand))
+
+          def pick(d):
+            return max(d.items(), key=lambda kv:kv[1])[0] if d else ''
+
+          out=[]
+          for i,(sym,e) in enumerate(sorted(by_symbol.items()),1):
+            profile=f'https://ngxgroup.com/exchange/data/company-profile/?directory=companydirectory&symbol={urllib.parse.quote(sym)}'
+            listed=''; incorp=''; sector=''; subsector=''; market=''; pname=''
+            status='UNRESOLVED'
+            try:
+              rr=requests.get(profile,timeout=60,headers={'User-Agent':'Mozilla/5.0 GlobalWealthAI issuer research'})
+              txt=re.sub(r'\s+',' ',rr.text)
+              def field(label):
+                patterns=[
+                  rf'{re.escape(label)}\s*</[^>]+>\s*<[^>]+>\s*:?\s*([^<]+)',
+                  rf'{re.escape(label)}\s*:\s*</[^>]+>\s*<[^>]+>\s*([^<]+)',
+                  rf'{re.escape(label)}\s*:\s*([^<]{{1,150}})'
+                ]
+                for p in patterns:
+                  m=re.search(p,txt,re.I)
+                  if m: return re.sub(r'&amp;','&',m.group(1)).strip()
+                return ''
+              listed=field('Date Listed')
+              incorp=field('Date of Incorporation')
+              sector=field('Sector')
+              subsector=field('Sub Sector')
+              market=field('Market Classification')
+              pname=field('Company Name')
+            except Exception:
+              pass
+
+            listing_year=None
+            if listed:
+              m=re.search(r'(19\d{2}|20\d{2})',listed)
+              if m:
+                yy=int(m.group(1))
+                if yy not in (1969,1970) and 1900<=yy<=2026:
+                  listing_year=yy; status='VERIFIED_NGX_PROFILE'
+                elif yy in (1969,1970):
+                  status='NGX_PROFILE_PLACEHOLDER_DATE'
+            if listing_year is None and e['first_filing_year']:
+              start_year=e['first_filing_year']
+            else:
+              start_year=listing_year
+
+            name=pname or pick(e['names']) or sym
+            isin=pick(e['isins'])
+            out.append({
+              'company_name':name,'ticker':sym,'isin':isin,'sector':sector,'sub_sector':subsector,'market_classification':market,
+              'date_listed_raw':listed,'listing_year_verified':listing_year or '', 'listing_date_status':status,
+              'date_incorporated_raw':incorp,'first_public_filing_year_seen':e['first_filing_year'] or '',
+              'last_public_filing_year_seen':e['last_filing_year'] or '', 'unique_public_filing_count':e['filing_count'],
+              'coverage_start_year':start_year or '', 'coverage_end_year':2026,'profile_url':profile
+            })
+            if i%30==0: time.sleep(1)
+
+          fields=list(out[0].keys()) if out else []
+          with open('out/NGX_ISSUER_MASTER_REGISTRY.csv','w',newline='',encoding='utf-8-sig') as f:
+            w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(out)
+          open('out/NGX_ISSUER_MASTER_REGISTRY.json','w',encoding='utf-8').write(json.dumps(out,ensure_ascii=False,indent=2))
+
+          coverage=[]
+          for r in out:
+            try: sy=int(r['coverage_start_year'])
+            except: continue
+            for y in range(sy,2027):
+              coverage.append({'ticker':r['ticker'],'company_name':r['company_name'],'year':y,'listing_date_status':r['listing_date_status'],'expected_coverage':True})
+          with open('out/NGX_YEAR_COVERAGE_REGISTER.csv','w',newline='',encoding='utf-8-sig') as f:
+            w=csv.DictWriter(f,fieldnames=['ticker','company_name','year','listing_date_status','expected_coverage']); w.writeheader(); w.writerows(coverage)
+
+          summary={
+            'issuer_count':len(out),
+            'verified_listing_year_count':sum(1 for r in out if r['listing_date_status']=='VERIFIED_NGX_PROFILE'),
+            'placeholder_or_unresolved_listing_date_count':sum(1 for r in out if r['listing_date_status']!='VERIFIED_NGX_PROFILE'),
+            'coverage_rows':len(coverage),
+            'generated_utc':datetime.utcnow().isoformat()+'Z'
+          }
+          open('out/ISSUER_REGISTRY_SUMMARY.json','w').write(json.dumps(summary,indent=2))
+          print(json.dumps(summary,indent=2))
+          assert len(out)>=200
+          PY
+
+      - name: Upload issuer registry artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx-issuer-registry-and-coverage
+          path: out
+          retention-days: 1
+          compression-level: 6
