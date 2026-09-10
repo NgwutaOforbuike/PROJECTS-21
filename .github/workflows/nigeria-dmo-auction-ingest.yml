@@ -1,0 +1,79 @@
+name: Nigeria DMO Auction Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/nigeria-dmo-auction-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare workspace
+        run: mkdir -p corpus/DMO artifacts
+
+      - name: Download historical FGN bond auction PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5921-summary-of-fgn-bond-auction-results-for-june-2026/file?tmpl=component|corpus/DMO/2026-06_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5874-summary-of-fgn-bond-auction-results-for-may-2026/file?tmpl=component|corpus/DMO/2026-05_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5840-summary-of-fgn-bond-auction-results-for-april-2026/file?tmpl=component|corpus/DMO/2026-04_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5791-summary-of-fgn-bond-auction-results-for-march-2026/file?tmpl=component|corpus/DMO/2026-03_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5742-summary-of-fgn-bond-auction-results-for-february-2026/file?tmpl=component|corpus/DMO/2026-02_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5687-summary-of-fgn-bond-auction-results-for-january-2026/file?tmpl=component|corpus/DMO/2026-01_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5639-summary-of-fgn-bond-auction-results-for-december-2025/file?tmpl=component|corpus/DMO/2025-12_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5612-summary-of-fgn-bond-auction-results-for-november-2025/file?tmpl=component|corpus/DMO/2025-11_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5569-summary-of-auction-results-for-october-2025/file?tmpl=component|corpus/DMO/2025-10_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5512-summary-of-fgn-bond-auction-results-for-september-2025/file?tmpl=component|corpus/DMO/2025-09_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5458-summary-of-fgn-bond-auction-results-for-august-2025/file?tmpl=component|corpus/DMO/2025-08_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5414-summary-of-fgn-bond-auction-results-for-july-2025/file?tmpl=component|corpus/DMO/2025-07_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5351-summary-of-fgn-bond-auction-results-for-june-2025/file?tmpl=component|corpus/DMO/2025-06_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5306-summary-of-fgn-bond-auction-results-for-may-2025/file?tmpl=component|corpus/DMO/2025-05_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5250-summary-of-fgn-bond-auction-results-for-april-2025/file?tmpl=component|corpus/DMO/2025-04_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5189-summary-of-fgn-bond-auction-results-for-march-2025/file?tmpl=component|corpus/DMO/2025-03_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5140-summary-of-fgn-bond-auction-results-for-february-2025/file?tmpl=component|corpus/DMO/2025-02_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5091-summary-of-fgn-bond-auction-results-for-january-2025/file?tmpl=component|corpus/DMO/2025-01_FGN_Bond_Auction_Result.pdf"
+          )
+          for item in "${urls[@]}"; do
+            url="${item%%|*}"; out="${item##*|}"
+            curl -fL --retry 4 --retry-delay 3 --connect-timeout 20 -A "Mozilla/5.0 GlobalWealthAI Research" "$url" -o "$out"
+            test -s "$out"
+          done
+
+      - name: Validate and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT=$(find corpus/DMO -type f -name '*.pdf' | wc -l)
+          echo "PDF documents acquired: $COUNT"
+          test "$COUNT" -eq 18
+          find corpus/DMO -type f -name '*.pdf' -print0 | xargs -0 file | tee artifacts/FILE_TYPES.txt
+          if grep -v 'PDF document' artifacts/FILE_TYPES.txt; then exit 1; fi
+          find corpus/DMO -type f -name '*.pdf' -print0 | sort -z | xargs -0 sha256sum > artifacts/SHA256SUMS.txt
+          {
+            echo 'corpus=Nigeria DMO FGN bond auction results tranche 2'
+            echo "documents=$COUNT"
+            echo 'publisher=Debt Management Office Nigeria'
+            echo 'period=January 2025 to June 2026 excluding July-August 2026 already in tranche 1'
+            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/ACQUISITION_MANIFEST.txt
+
+      - name: Package
+        run: |
+          zip -qr artifacts/nigeria-dmo-auction-tranche-02.zip corpus artifacts/SHA256SUMS.txt artifacts/FILE_TYPES.txt artifacts/ACQUISITION_MANIFEST.txt
+          test $(stat -c%s artifacts/nigeria-dmo-auction-tranche-02.zip) -lt 100000000
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nigeria-dmo-auction-tranche-02
+          path: artifacts/nigeria-dmo-auction-tranche-02.zip
+          retention-days: 1
+          compression-level: 0
