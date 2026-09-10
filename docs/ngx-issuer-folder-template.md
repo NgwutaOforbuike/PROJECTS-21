@@ -1,0 +1,7 @@
+Issuer folder template:
+00_Company_Profile_and_Identifiers
+01_Listing_Capital_and_Ownership_History
+02_Filings_By_Year
+03_Transaction_Readiness
+04_Research_and_Valuation
+05_Risk_and_Red_Flags
