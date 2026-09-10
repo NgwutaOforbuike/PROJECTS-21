@@ -1,0 +1,1 @@
+The NGX issuer archive is organized as a transaction-ready intelligence vault. Primary files are stored individually by issuer, filing year and disclosure category; coverage registers track all years from verified listing year through 2026.
