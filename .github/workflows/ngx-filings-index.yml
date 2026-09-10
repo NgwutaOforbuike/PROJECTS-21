@@ -1,0 +1,91 @@
+name: NGX Filings Master Index
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ngx-filings-index.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Build complete public NGX filing index
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          import requests,json,csv,collections,datetime,urllib.parse
+          s=requests.Session()
+          s.headers.update({'Accept':'application/json;odata=verbose','User-Agent':'GlobalWealthAI/1.0 research archive'})
+          base="https://doclib.ngxgroup.com/_api/web/lists/getByTitle('XFinancial_News')/items/"
+          params={
+            '$select':'ID,URL,Modified,Created,CompanyName,CompanySymbol,InternationSecIN,Type_of_Submission',
+            '$orderby':'ID asc',
+            '$top':'5000'
+          }
+          url=base+'?'+urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
+          rows=[]; pages=0
+          seen_ids=set()
+          while url:
+            pages+=1
+            r=s.get(url,timeout=90); r.raise_for_status()
+            data=r.json().get('d',{})
+            batch=data.get('results',[])
+            for x in batch:
+              if x.get('ID') not in seen_ids:
+                rows.append(x); seen_ids.add(x.get('ID'))
+            url=data.get('__next')
+            print('page',pages,'batch',len(batch),'total',len(rows),'next',bool(url))
+            if pages>100: raise RuntimeError('pagination runaway')
+          # normalize
+          norm=[]
+          for x in rows:
+            u=x.get('URL') or {}
+            norm.append({
+              'id':x.get('ID'),
+              'company_name':x.get('CompanyName'),
+              'company_symbol':x.get('CompanySymbol'),
+              'isin':x.get('InternationSecIN'),
+              'submission_type':x.get('Type_of_Submission'),
+              'created':x.get('Created'),
+              'modified':x.get('Modified'),
+              'url':u.get('Url') if isinstance(u,dict) else None,
+              'description':u.get('Description') if isinstance(u,dict) else None,
+            })
+          open('out/ngx_filings_master_index.json','w',encoding='utf-8').write(json.dumps(norm,ensure_ascii=False,indent=2))
+          with open('out/ngx_filings_master_index.csv','w',newline='',encoding='utf-8') as f:
+            w=csv.DictWriter(f,fieldnames=norm[0].keys() if norm else ['id']); w.writeheader(); w.writerows(norm)
+          bytype=collections.Counter((x.get('submission_type') or 'UNKNOWN') for x in norm)
+          bysymbol=collections.Counter((x.get('company_symbol') or 'UNKNOWN') for x in norm)
+          urls=[x['url'] for x in norm if x.get('url')]
+          unique_urls=list(dict.fromkeys(urls))
+          dates=[x.get('created') or x.get('modified') for x in norm if x.get('created') or x.get('modified')]
+          summary={
+            'indexed_rows':len(norm),
+            'rows_with_urls':len(urls),
+            'unique_urls':len(unique_urls),
+            'unique_symbols':len(bysymbol),
+            'pagination_pages':pages,
+            'earliest_timestamp':min(dates) if dates else None,
+            'latest_timestamp':max(dates) if dates else None,
+            'submission_types':bytype.most_common(),
+            'top_symbols':bysymbol.most_common(50),
+            'indexed_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'source':base,
+          }
+          open('out/SUMMARY.json','w',encoding='utf-8').write(json.dumps(summary,ensure_ascii=False,indent=2))
+          print(json.dumps(summary,ensure_ascii=False))
+          assert len(norm)>0
+          PY
+
+      - name: Upload master index
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx-filings-master-index
+          path: out
+          retention-days: 1
+          compression-level: 6
