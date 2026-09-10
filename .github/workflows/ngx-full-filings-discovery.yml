@@ -1,0 +1,63 @@
+name: NGX Full Filings Discovery
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ngx-full-filings-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare
+        run: mkdir -p out
+
+      - name: Inspect NGX disclosure pages and scripts
+        run: |
+          python - <<'PY'
+          import requests,re,json,urllib.parse
+          from bs4 import BeautifulSoup
+          s=requests.Session()
+          s.headers.update({'User-Agent':'Mozilla/5.0 GlobalWealthAI Research'})
+          urls=[
+            'https://ngxgroup.com/exchange/data/corporate-disclosures/',
+            'https://ngxgroup.com/exchange/data/company-profile/?directory=companydirectory&symbol=NGXGROUP',
+            'https://ngxgroup.com/exchange/raise-capital/release-calendar/'
+          ]
+          allscripts=[]
+          for i,u in enumerate(urls):
+            r=s.get(u,timeout=60); r.raise_for_status()
+            open(f'out/page_{i}.html','w',encoding='utf-8').write(r.text)
+            soup=BeautifulSoup(r.text,'html.parser')
+            for x in soup.find_all('script',src=True):
+              allscripts.append(urllib.parse.urljoin(u,x['src']))
+          allscripts=list(dict.fromkeys(allscripts))
+          open('out/scripts.json','w').write(json.dumps(allscripts,indent=2))
+          pats=('ajax','disclosure','companydirectory','financial','director','wp-json','api','news')
+          findings=[]
+          for j,u in enumerate(allscripts):
+            try:
+              r=s.get(u,timeout=45)
+              if r.ok and len(r.text)<8_000_000:
+                txt=r.text
+                open(f'out/script_{j}.js','w',encoding='utf-8').write(txt)
+                for line in txt.splitlines():
+                  if any(p in line.lower() for p in pats): findings.append({'url':u,'line':line[:2000]})
+            except Exception as e:
+              findings.append({'url':u,'error':str(e)})
+          open('out/findings.json','w',encoding='utf-8').write(json.dumps(findings,indent=2))
+          print('scripts',len(allscripts),'findings',len(findings))
+          for f in findings[:100]: print(json.dumps(f,ensure_ascii=False))
+          PY
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx-discovery-diagnostics
+          path: out
+          retention-days: 1
