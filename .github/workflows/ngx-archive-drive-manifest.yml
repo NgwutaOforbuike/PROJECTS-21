@@ -1,0 +1,13 @@
+name: NGX Archive Hierarchy Manifest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hierarchy is managed from NGX_ARCHIVE_STRUCTURE.md and issuer registry artifacts."
