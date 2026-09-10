@@ -21,7 +21,16 @@ jobs:
         run: |
           python - <<'PY'
           import requests,re,json,urllib.parse
-          from bs4 import BeautifulSoup
+          from html.parser import HTMLParser
+
+          class ScriptParser(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.srcs=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower()=='script':
+                      d=dict(attrs)
+                      if d.get('src'): self.srcs.append(d['src'])
+
           s=requests.Session()
           s.headers.update({'User-Agent':'Mozilla/5.0 GlobalWealthAI Research'})
           urls=[
@@ -33,12 +42,11 @@ jobs:
           for i,u in enumerate(urls):
             r=s.get(u,timeout=60); r.raise_for_status()
             open(f'out/page_{i}.html','w',encoding='utf-8').write(r.text)
-            soup=BeautifulSoup(r.text,'html.parser')
-            for x in soup.find_all('script',src=True):
-              allscripts.append(urllib.parse.urljoin(u,x['src']))
+            p=ScriptParser(); p.feed(r.text)
+            allscripts.extend(urllib.parse.urljoin(u,x) for x in p.srcs)
           allscripts=list(dict.fromkeys(allscripts))
           open('out/scripts.json','w').write(json.dumps(allscripts,indent=2))
-          pats=('ajax','disclosure','companydirectory','financial','director','wp-json','api','news')
+          pats=('ajax','disclosure','companydirectory','financial','director','wp-json','api','news','download')
           findings=[]
           for j,u in enumerate(allscripts):
             try:
@@ -47,12 +55,17 @@ jobs:
                 txt=r.text
                 open(f'out/script_{j}.js','w',encoding='utf-8').write(txt)
                 for line in txt.splitlines():
-                  if any(p in line.lower() for p in pats): findings.append({'url':u,'line':line[:2000]})
+                  if any(p in line.lower() for p in pats): findings.append({'url':u,'line':line[:3000]})
             except Exception as e:
               findings.append({'url':u,'error':str(e)})
+          for i in range(len(urls)):
+            txt=open(f'out/page_{i}.html',encoding='utf-8').read()
+            for pat in [r'https?://[^\"\'\s<>]+', r'/wp-admin/admin-ajax\.php', r'/wp-json/[^\"\'\s<>]+']:
+              for m in re.findall(pat,txt):
+                if any(p in m.lower() for p in pats): findings.append({'page':i,'match':m[:3000]})
           open('out/findings.json','w',encoding='utf-8').write(json.dumps(findings,indent=2))
           print('scripts',len(allscripts),'findings',len(findings))
-          for f in findings[:100]: print(json.dumps(f,ensure_ascii=False))
+          for f in findings[:150]: print(json.dumps(f,ensure_ascii=False))
           PY
 
       - name: Upload diagnostics
