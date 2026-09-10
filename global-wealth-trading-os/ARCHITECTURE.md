@@ -97,3 +97,23 @@ These controls sit outside the forecasting models so a model cannot suppress its
 - training_cli.py — reproducible command-line training entry point.
 
 Production models are trained only on time-ordered, provenance-labelled datasets. The system never trains on the held-out test set and never promotes directly to live execution.
+
+## Cost-aware decision and calibration layer — 2026-09-10
+
+The 5% modelled-return hurdle is evaluated conservatively when calibration error and estimated round-trip costs are available:
+
+`conservative net return = point forecast - calibration error buffer - estimated round-trip costs`
+
+A point forecast that clears 5% but falls below 5% after those deductions is a no-trade. This is intentionally asymmetric: missing upside is preferable to weakening the owner's hurdle.
+
+Risk sizing now treats estimated round-trip costs as part of the planned loss budget. Position notional is also capped by cash available, so the sizing layer cannot create leverage. The owner's core mandate remains unchanged: Nigeria/USA/UK only, 0.5% maximum planned risk per trade, minimum 5% modelled-return hurdle, no forced trades, leverage off, and live execution disabled unless separately authorised.
+
+Backtest metrics can accept per-trade transaction-cost estimates and report net performance rather than only gross strategy returns. Calibration diagnostics include Brier score and expected calibration error for directional confidence, making it possible to distinguish a model that is directionally accurate from one whose confidence estimates are trustworthy.
+
+### External operating context checked for this revision
+
+- Nigeria SEC: proposed Digital and Virtual Assets Operations, Custody and Markets rules published 20 August 2026. Digital-asset logic must remain jurisdiction-aware and should not assume rules are static.
+- UK HM Treasury: T+1 settlement is planned to become mandatory from 11 October 2027, increasing the importance of execution, cash and settlement-state realism.
+- U.S. SEC: the 2023 predictive-data-analytics conflict proposal was formally withdrawn in June 2025. Internal AI governance therefore remains a system control rather than being hard-coded to a withdrawn proposal.
+
+These developments are context for governance and testing; they do not autonomously relax or activate any trading permission.
