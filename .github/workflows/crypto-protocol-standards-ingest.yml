@@ -1,0 +1,99 @@
+name: Crypto Protocol Standards Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/crypto-protocol-standards-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare workspace
+        run: mkdir -p sources corpus artifacts
+
+      - name: Clone canonical standards repositories
+        run: |
+          git clone --depth 1 https://github.com/ethereum/EIPs.git sources/EIPs
+          git clone --depth 1 https://github.com/bitcoin/bips.git sources/bips
+
+      - name: Select and catalogue 750 protocol documents
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil, hashlib, json, re, datetime
+          candidates=[]
+          for p in Path('sources/EIPs/EIPS').glob('eip-*.md'):
+              candidates.append(('ethereum_eip',p))
+          for p in Path('sources/bips').iterdir():
+              if p.is_file() and re.match(r'bip-\d+\.(mediawiki|md)$',p.name,re.I):
+                  candidates.append(('bitcoin_bip',p))
+          candidates=sorted(candidates,key=lambda x:(x[0],x[1].name))
+          selected=candidates[:750]
+          assert len(selected)>=700, f'Only {len(selected)} standards found'
+          metadata=[]; hashes=[]
+          for kind,p in selected:
+              dst=Path('corpus')/kind/p.name
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(p,dst)
+              data=dst.read_bytes()
+              hashes.append(f'{hashlib.sha256(data).hexdigest()}  {dst.relative_to("corpus")}')
+              metadata.append({'type':kind,'filename':p.name,'source_repository':'https://github.com/ethereum/EIPs' if kind=='ethereum_eip' else 'https://github.com/bitcoin/bips'})
+          Path('artifacts/SHA256SUMS.txt').write_text('\n'.join(hashes)+'\n',encoding='utf-8')
+          Path('artifacts/DOCUMENT_INDEX.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
+          manifest=[
+              'corpus=Canonical crypto protocol standards tranche 1',
+              f'documents={len(selected)}',
+              'sources=https://github.com/ethereum/EIPs; https://github.com/bitcoin/bips',
+              'content=Ethereum Improvement Proposals and Bitcoin Improvement Proposals',
+              f'acquisition_utc={datetime.datetime.now(datetime.timezone.utc).isoformat()}',
+              'validation=non-empty canonical repository documents with SHA-256 fingerprints'
+          ]
+          Path('artifacts/ACQUISITION_MANIFEST.txt').write_text('\n'.join(manifest)+'\n',encoding='utf-8')
+          print('Selected protocol documents:',len(selected))
+          PY
+
+      - name: Package into three Drive-safe bundles
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          files=sorted([p for p in Path('corpus').rglob('*') if p.is_file()])
+          chunks=[files[i:i+250] for i in range(0,len(files),250)]
+          for i,chunk in enumerate(chunks,1):
+              out=Path('artifacts')/f'crypto-protocol-standards-bundle-{i:02d}.zip'
+              with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+                  for p in chunk: z.write(p,p.relative_to('corpus'))
+                  z.write('artifacts/ACQUISITION_MANIFEST.txt','ACQUISITION_MANIFEST.txt')
+                  z.write('artifacts/SHA256SUMS.txt','SHA256SUMS.txt')
+                  z.write('artifacts/DOCUMENT_INDEX.json','DOCUMENT_INDEX.json')
+              print(out.name,len(chunk),out.stat().st_size)
+              assert out.stat().st_size<95_000_000
+          PY
+
+      - name: Upload bundle 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-protocol-standards-bundle-01
+          path: artifacts/crypto-protocol-standards-bundle-01.zip
+          retention-days: 1
+          compression-level: 0
+      - name: Upload bundle 2
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-protocol-standards-bundle-02
+          path: artifacts/crypto-protocol-standards-bundle-02.zip
+          retention-days: 1
+          compression-level: 0
+      - name: Upload bundle 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-protocol-standards-bundle-03
+          path: artifacts/crypto-protocol-standards-bundle-03.zip
+          retention-days: 1
+          compression-level: 0
