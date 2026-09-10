@@ -2,10 +2,11 @@ name: NGX Batch Download
 
 on:
   push:
-    branches: [ngx-filings-archive]
+    branches:
+      - ngx-filings-archive
     paths:
-      - "ngx_archive/batch_*_urls.txt"
-      - ".github/workflows/ngx-batch-download.yml"
+      - 'ngx_archive/batch_*_urls.txt'
+      - '.github/workflows/ngx-batch-download.yml'
   workflow_dispatch:
 
 permissions:
@@ -27,21 +28,15 @@ jobs:
           echo 'url,status,http_code,bytes,filename' > download_status.csv
           while IFS= read -r url; do
             [ -z "$url" ] && continue
-            fname=$(python - <<'PY' "$url"
-import sys, urllib.parse, os
-u=sys.argv[1]
-p=urllib.parse.urlparse(u).path
-print(os.path.basename(urllib.parse.unquote(p)) or 'document.pdf')
-PY
-)
-            safe=$(echo "$fname" | tr '/\\:*?"<>|' '_' )
+            fname=$(python -c "import sys,urllib.parse,os; p=urllib.parse.urlparse(sys.argv[1]).path; print(os.path.basename(urllib.parse.unquote(p)) or 'document.pdf')" "$url")
+            safe=$(printf '%s' "$fname" | tr '/\\:*?<>|' '_')
             code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 -A 'Mozilla/5.0' -o "downloaded/$safe" -w '%{http_code}' -sS "$url" || true)
             if [ -s "downloaded/$safe" ] && [ "$code" = "200" ]; then
               bytes=$(wc -c < "downloaded/$safe" | tr -d ' ')
-              echo '"'"$url"'",downloaded,'"$code"','"$bytes"','"$safe"'"' >> download_status.csv
+              printf '"%s",downloaded,"%s","%s","%s"\n' "$url" "$code" "$bytes" "$safe" >> download_status.csv
             else
               rm -f "downloaded/$safe"
-              echo '"'"$url"'",blocked_or_failed,'"$code"',0,'"$safe"'"' >> download_status.csv
+              printf '"%s",blocked_or_failed,"%s",0,"%s"\n' "$url" "$code" "$safe" >> download_status.csv
             fi
           done < ngx_archive/batch_001_urls.txt
           cat download_status.csv
