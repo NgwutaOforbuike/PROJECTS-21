@@ -1,0 +1,1 @@
+Current implementation: high-level Drive control folders created; issuer registry generation in progress; individual-file migration and category routing will use the permanent issuer intelligence structure rather than ZIPs.
