@@ -1,0 +1,79 @@
+name: Nigeria NBS Direct Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/nigeria-nbs-direct-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare workspace
+        run: mkdir -p corpus/CPI corpus/GDP artifacts
+
+      - name: Download direct NBS reports and tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1254|corpus/CPI/2025-06_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1255|corpus/CPI/2025-06_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1232|corpus/CPI/2025-05_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1233|corpus/CPI/2025-05_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1212|corpus/CPI/2025-04_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1213|corpus/CPI/2025-04_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1198|corpus/CPI/2025-03_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1199|corpus/CPI/2025-03_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1161|corpus/CPI/2025-02_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1162|corpus/CPI/2025-02_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1156|corpus/CPI/2024_CPI_Rebasing_Highlights.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1126|corpus/CPI/2024-12_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1127|corpus/CPI/2024-12_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1116|corpus/CPI/2024-11_CPI_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1117|corpus/CPI/2024-11_CPI_Tables.xlsx"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/147/download/1258/Q1_2025_GDP%20Report.pdf|corpus/GDP/2025_Q1_GDP_Report.pdf"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/147/download/1256/GDP_Rebasing_2025_%20Final.pdf|corpus/GDP/2025_GDP_Rebasing_Report.pdf"
+          )
+          for item in "${urls[@]}"; do
+            url="${item%%|*}"; out="${item##*|}"
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 60 -A "Mozilla/5.0 GlobalWealthAI Research" "$url" -o "$out"
+            test -s "$out"
+          done
+
+      - name: Validate formats and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT=$(find corpus -type f | wc -l)
+          echo "Source files acquired: $COUNT"
+          test "$COUNT" -eq 17
+          find corpus -type f -print0 | xargs -0 file | tee artifacts/FILE_TYPES.txt
+          BAD=$(grep -Ev 'PDF document|Microsoft Excel|Zip archive data|CDFV2 Microsoft Excel' artifacts/FILE_TYPES.txt || true)
+          if [ -n "$BAD" ]; then echo "$BAD"; exit 1; fi
+          find corpus -type f -print0 | sort -z | xargs -0 sha256sum > artifacts/SHA256SUMS.txt
+          {
+            echo 'corpus=Nigeria NBS direct macro tranche 4'
+            echo 'publisher=National Bureau of Statistics Nigeria'
+            echo "documents=$COUNT"
+            echo 'coverage=CPI reports/tables 2024-11 to 2025-06; CPI rebasing; GDP Q1 2025; GDP rebasing'
+            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/ACQUISITION_MANIFEST.txt
+
+      - name: Package and upload
+        run: |
+          zip -qr artifacts/nigeria-nbs-direct-tranche-04.zip corpus artifacts/SHA256SUMS.txt artifacts/FILE_TYPES.txt artifacts/ACQUISITION_MANIFEST.txt
+          test $(stat -c%s artifacts/nigeria-nbs-direct-tranche-04.zip) -lt 100000000
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nigeria-nbs-direct-tranche-04
+          path: artifacts/nigeria-nbs-direct-tranche-04.zip
+          retention-days: 1
+          compression-level: 0
