@@ -1,0 +1,3 @@
+# Purpose of the NGX Issuer Intelligence Vault
+
+This archive supports long-horizon investment research, public-market monitoring, valuation, corporate-finance analysis, M&A and takeover screening, capital raising, debt and restructuring analysis, governance diligence, regulatory review and future transaction execution. Source materials are maintained separately from derived analysis so any investment or deal conclusion can be traced back to the underlying filing.
