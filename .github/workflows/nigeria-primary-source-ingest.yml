@@ -1,0 +1,98 @@
+name: Nigeria Primary Source Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/nigeria-primary-source-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare workspace
+        run: |
+          mkdir -p corpus/SEC_Nigeria corpus/DMO artifacts
+
+      - name: Download SEC Nigeria primary-source PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://sec.gov.ng/documents/1514/Rules_for_Public_Offering_of_Securities_by_A_Free_Trade_Zone_Entity_FTZE.pdf|corpus/SEC_Nigeria/2026-09-08_Rules_Public_Offering_Free_Trade_Zone_Entity.pdf"
+            "https://sec.gov.ng/documents/1506/Rules_on_Sharia_Advisory_Services.pdf|corpus/SEC_Nigeria/2026-08-21_Rules_Shariah_Advisory_Services.pdf"
+            "https://sec.gov.ng/documents/1505/Amendment_to_Rules_on_Fund_Portfolio_Management_Operations.pdf|corpus/SEC_Nigeria/2026_Amendment_Fund_Portfolio_Management_Operations.pdf"
+            "https://sec.gov.ng/documents/1385/APPROVED_RULES_ON_CREDIT_ENHANCEMENT_FACILITY_PROVIDERS2_g9yubf1.pdf|corpus/SEC_Nigeria/Rules_Credit_Enhancement_Facility_Providers.pdf"
+            "https://sec.gov.ng/documents/1323/New-Rules-and-sundry-amendments-April-2025.pdf|corpus/SEC_Nigeria/2025-04_New_Rules_and_Sundry_Amendments.pdf"
+            "https://sec.gov.ng/documents/1322/Executed-Rules-Dec-2024.pdf|corpus/SEC_Nigeria/2024-12_Executed_Rules.pdf"
+            "https://sec.gov.ng/documents/7/SEC-AMLCFTCPF-REGULATIONS-12-MAY-2022.pdf|corpus/SEC_Nigeria/2022-05-12_AML_CFT_CPF_Regulations.pdf"
+            "https://sec.gov.ng/documents/8/Rules-on-Issuance-Offering-and-Custody-of-Digital-Assets.pdf|corpus/SEC_Nigeria/2022-05-11_Digital_Assets_Rules.pdf"
+            "https://sec.gov.ng/documents/9/SEC-NG-Approved-Major-Ammendments-to-Rules-Dec-20-2021_V2.pdf|corpus/SEC_Nigeria/2021-12-20_Major_Amendments_to_Rules.pdf"
+            "https://sec.gov.ng/documents/10/Social-Bond-Rule-New-October-29-2021.pdf|corpus/SEC_Nigeria/2021-10-29_Social_Bond_Rule.pdf"
+            "https://sec.gov.ng/documents/11/New-Rules-and-Amendments-_Executed-30-August-2021.pdf|corpus/SEC_Nigeria/2021-08-30_New_Rules_and_Amendments.pdf"
+            "https://sec.gov.ng/documents/12/Executed-Rules-May-24-2021.pdf|corpus/SEC_Nigeria/2021-05-24_Executed_Rules.pdf"
+            "https://sec.gov.ng/documents/13/Major-Amendments-to-the-SEC-NIGERIA-rules-26-April-2021.pdf|corpus/SEC_Nigeria/2021-04-26_Major_Amendments.pdf"
+            "https://sec.gov.ng/documents/14/Executed-Rules-and-Amendments_22-March-2021.pdf|corpus/SEC_Nigeria/2021-03-22_Executed_Rules_and_Amendments.pdf"
+            "https://sec.gov.ng/documents/15/Jan-2021-Executed-Rules.pdf|corpus/SEC_Nigeria/2021-01_Executed_Rules.pdf"
+            "https://sec.gov.ng/documents/16/New-Rules-and-Sundry-Amendments-as-at-10-September-2020.pdf|corpus/SEC_Nigeria/2020-09-10_New_Rules_and_Sundry_Amendments.pdf"
+            "https://sec.gov.ng/documents/17/SEC-New-Rules-and-Ammendments-23-December-2019.pdf|corpus/SEC_Nigeria/2019-12-23_New_Rules_and_Amendments.pdf"
+            "https://sec.gov.ng/documents/1352/New_Rules_and_Sundry_Amendments_August_21_2019.pdf|corpus/SEC_Nigeria/2019-08-21_New_Rules_and_Sundry_Amendments.pdf"
+          )
+          for item in "${urls[@]}"; do
+            url="${item%%|*}"; out="${item##*|}"
+            curl -fL --retry 4 --retry-delay 3 --connect-timeout 20 -A "Mozilla/5.0 GlobalWealthAI Research" "$url" -o "$out"
+            test -s "$out"
+          done
+
+      - name: Download DMO FGN bond auction PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/6019-summary-of-fgn-bond-auction-results-for-august-2026/file?tmpl=component|corpus/DMO/2026-08_FGN_Bond_Auction_Result.pdf"
+            "https://www.dmo.gov.ng/fgn-bonds/bonds-auction-results/5961-summary-of-fgn-bond-auction-results-for-july-2026/file?tmpl=component|corpus/DMO/2026-07_FGN_Bond_Auction_Result.pdf"
+          )
+          for item in "${urls[@]}"; do
+            url="${item%%|*}"; out="${item##*|}"
+            curl -fL --retry 4 --retry-delay 3 --connect-timeout 20 -A "Mozilla/5.0 GlobalWealthAI Research" "$url" -o "$out"
+            test -s "$out"
+          done
+
+      - name: Validate PDFs and create integrity manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT=$(find corpus -type f -name '*.pdf' | wc -l)
+          echo "PDF documents acquired: $COUNT"
+          test "$COUNT" -eq 20
+          find corpus -type f -name '*.pdf' -print0 | xargs -0 file | tee artifacts/FILE_TYPES.txt
+          if grep -v 'PDF document' artifacts/FILE_TYPES.txt; then
+            echo 'Non-PDF file detected' >&2
+            exit 1
+          fi
+          find corpus -type f -name '*.pdf' -print0 | sort -z | xargs -0 sha256sum > artifacts/SHA256SUMS.txt
+          {
+            echo 'corpus=Nigeria primary sources tranche 1'
+            echo "documents=$COUNT"
+            echo 'publishers=Securities and Exchange Commission Nigeria; Debt Management Office Nigeria'
+            echo 'document_type=official PDF primary sources'
+            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/ACQUISITION_MANIFEST.txt
+
+      - name: Package Drive-safe corpus
+        run: |
+          zip -qr artifacts/nigeria-primary-sources-tranche-01.zip corpus artifacts/SHA256SUMS.txt artifacts/FILE_TYPES.txt artifacts/ACQUISITION_MANIFEST.txt
+          ls -lh artifacts/nigeria-primary-sources-tranche-01.zip
+          test $(stat -c%s artifacts/nigeria-primary-sources-tranche-01.zip) -lt 100000000
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nigeria-primary-sources-tranche-01
+          path: artifacts/nigeria-primary-sources-tranche-01.zip
+          retention-days: 1
+          compression-level: 0
