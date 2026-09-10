@@ -1,0 +1,98 @@
+name: World Bank Macro Data Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/world-bank-macro-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare workspace
+        run: mkdir -p corpus/indicators artifacts
+
+      - name: Download official indicator metadata and historical observations
+        run: |
+          python - <<'PY'
+          import urllib.request, urllib.parse, json, csv, pathlib, time, hashlib, datetime
+          UA={'User-Agent':'GlobalWealthAI/1.0 research corpus'}
+          def get(url):
+              req=urllib.request.Request(url,headers=UA)
+              with urllib.request.urlopen(req,timeout=60) as r: return r.read()
+
+          meta=[]
+          page=1
+          while page<=3:
+              url=f'https://api.worldbank.org/v2/indicator?format=json&per_page=500&page={page}'
+              data=json.loads(get(url))
+              if not data or len(data)<2: break
+              meta.extend(data[1])
+              if page>=int(data[0].get('pages',page)): break
+              page+=1
+          # Prefer indicators with useful finance/macro keywords.
+          kws=('gdp','inflation','consumer price','interest','exchange rate','money','credit','debt','current account','trade','unemployment','employment','population','savings','investment','market capitalization','stocks traded','bank','reserves','exports','imports','tax','government','fiscal','commodity','energy','rent','foreign direct investment')
+          chosen=[]
+          seen=set()
+          for m in meta:
+              text=(m.get('name','')+' '+(m.get('sourceNote') or '')).lower()
+              if any(k in text for k in kws) and m.get('id') not in seen:
+                  chosen.append(m); seen.add(m.get('id'))
+              if len(chosen)>=200: break
+          assert len(chosen)>=150, f'Only {len(chosen)} indicators selected'
+          pathlib.Path('artifacts/INDICATOR_METADATA.json').write_text(json.dumps(chosen,indent=2,ensure_ascii=False),encoding='utf-8')
+
+          hashes=[]; ok=0; empty=[]
+          for idx,m in enumerate(chosen,1):
+              code=m['id']; safe=code.replace('.','_').replace('/','_')
+              url='https://api.worldbank.org/v2/country/all/indicator/'+urllib.parse.quote(code,safe='')+'?format=json&per_page=20000&date=1960:2026'
+              try:
+                  payload=json.loads(get(url))
+                  rows=payload[1] if payload and len(payload)>1 and payload[1] else []
+              except Exception as e:
+                  rows=[]
+              rows=[r for r in rows if r.get('value') is not None]
+              if not rows:
+                  empty.append(code); continue
+              out=pathlib.Path('corpus/indicators')/f'{safe}.csv'
+              with out.open('w',newline='',encoding='utf-8') as f:
+                  w=csv.writer(f); w.writerow(['indicator_code','indicator_name','country_id','country_name','countryiso3code','date','value','unit','obs_status','decimal'])
+                  for r in rows:
+                      w.writerow([code,m.get('name',''),r.get('country',{}).get('id',''),r.get('country',{}).get('value',''),r.get('countryiso3code',''),r.get('date',''),r.get('value'),r.get('unit',''),r.get('obs_status',''),r.get('decimal','')])
+              data=out.read_bytes(); hashes.append(f'{hashlib.sha256(data).hexdigest()}  {out.relative_to("corpus")}'); ok+=1
+              if idx%25==0: print('Processed indicators:',idx,'nonempty:',ok)
+              time.sleep(0.05)
+          assert ok>=120, f'Only {ok} non-empty indicator datasets'
+          pathlib.Path('artifacts/SHA256SUMS.txt').write_text('\n'.join(hashes)+'\n',encoding='utf-8')
+          pathlib.Path('artifacts/EMPTY_OR_FAILED.txt').write_text('\n'.join(empty)+'\n',encoding='utf-8')
+          pathlib.Path('artifacts/ACQUISITION_MANIFEST.txt').write_text('\n'.join([
+              'corpus=World Bank official macroeconomic indicators tranche 1',
+              'source=https://api.worldbank.org/v2/',
+              'authentication=none',
+              f'selected_indicators={len(chosen)}',
+              f'nonempty_indicator_files={ok}',
+              'history=1960-2026 where observations exist',
+              f'acquisition_utc={datetime.datetime.now(datetime.timezone.utc).isoformat()}',
+              'format=one CSV per indicator plus official metadata JSON and hashes'
+          ])+'\n',encoding='utf-8')
+          print('Non-empty World Bank datasets:',ok)
+          PY
+
+      - name: Package Drive-safe data bundle
+        run: |
+          zip -qr artifacts/world-bank-macro-tranche-01.zip corpus artifacts/INDICATOR_METADATA.json artifacts/SHA256SUMS.txt artifacts/EMPTY_OR_FAILED.txt artifacts/ACQUISITION_MANIFEST.txt
+          ls -lh artifacts/world-bank-macro-tranche-01.zip
+          test $(stat -c%s artifacts/world-bank-macro-tranche-01.zip) -lt 95000000
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-bank-macro-tranche-01
+          path: artifacts/world-bank-macro-tranche-01.zip
+          retention-days: 1
+          compression-level: 0
