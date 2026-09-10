@@ -1,0 +1,1 @@
+Year routing: use the reporting/document year stated in the filing where reliable; otherwise use the NGX filing/submission date year. Do not use a future forecast, maturity or dividend-payment year as the filing year. Record both reporting year and NGX submission date in metadata.
