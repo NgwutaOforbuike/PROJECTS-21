@@ -1,0 +1,1 @@
+This folder system is intended to support investment research, transaction screening, M&A, capital markets, financing, restructuring and governance diligence. Primary-source documents are maintained separately from derived analysis and transaction work product.
