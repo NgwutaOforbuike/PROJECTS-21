@@ -1,0 +1,1 @@
+The issuer coverage register is authoritative for chronology. It records every year from verified listing year through 2026 and distinguishes complete source coverage from missing/partial years. Folder existence alone must never be interpreted as evidence that a year is complete.
