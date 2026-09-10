@@ -1,0 +1,1 @@
+Permanent Drive vault initialized. Individual PDF migration has started. Company/ticker folders, year folders and filing-category folders are being created on demand as verified source PDFs are migrated from temporary transfer packages.
