@@ -1,0 +1,88 @@
+name: NGX Filings Tranche 001
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ngx-filings-tranche-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Acquire 100 unique NGX filings
+        run: |
+          mkdir -p corpus out
+          python - <<'PY'
+          import requests,urllib.parse,json,pathlib,hashlib,time,re,os,csv,zipfile
+          shard=int(os.environ['SHARD'])
+          start=shard*100; stop=start+100
+          s=requests.Session(); s.headers.update({'Accept':'application/json;odata=verbose','User-Agent':'GlobalWealthAI/1.0 public filing archive'})
+          base="https://doclib.ngxgroup.com/_api/web/lists/getByTitle('XFinancial_News')/items/"
+          params={'$select':'ID,URL,Modified,Created,CompanyName,CompanySymbol,InternationSecIN,Type_of_Submission','$orderby':'ID asc','$top':'5000'}
+          url=base+'?'+urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
+          rows=[]; seen=set()
+          while url and len(rows)<stop:
+            r=s.get(url,timeout=90); r.raise_for_status(); d=r.json()['d']
+            for x in d.get('results',[]):
+              u=(x.get('URL') or {}).get('Url') if isinstance(x.get('URL'),dict) else None
+              if u and u not in seen:
+                seen.add(u); rows.append(x)
+            url=d.get('__next')
+          chosen=rows[start:stop]
+          assert len(chosen)==100, f'Expected 100 URLs, got {len(chosen)}'
+          manifest=[]; failures=[]
+          for i,x in enumerate(chosen,start+1):
+            u=(x.get('URL') or {}).get('Url')
+            desc=(x.get('URL') or {}).get('Description') or ''
+            for attempt in range(4):
+              try:
+                rr=requests.get(u,timeout=120,headers={'User-Agent':'GlobalWealthAI/1.0 public filing archive'})
+                rr.raise_for_status(); data=rr.content
+                if not data.startswith(b'%PDF'): raise ValueError('payload not PDF')
+                h=hashlib.sha256(data).hexdigest()
+                sym=re.sub(r'[^A-Za-z0-9_.-]+','_',str(x.get('CompanySymbol') or 'UNKNOWN'))[:40]
+                fn=f'{i:05d}_{x.get("ID")}_{sym}_{h[:10]}.pdf'
+                pathlib.Path('corpus',fn).write_bytes(data)
+                manifest.append({'global_position':i,'sharepoint_id':x.get('ID'),'company_name':x.get('CompanyName'),'company_symbol':x.get('CompanySymbol'),'isin':x.get('InternationSecIN'),'submission_type':x.get('Type_of_Submission'),'created':x.get('Created'),'modified':x.get('Modified'),'source_url':u,'source_description':desc,'sha256':h,'bytes':len(data),'filename':fn})
+                break
+              except Exception as e:
+                if attempt==3: failures.append({'position':i,'url':u,'error':str(e)})
+                time.sleep(2+attempt*2)
+          pathlib.Path('out/manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          pathlib.Path('out/failures.json').write_text(json.dumps(failures,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('SHARD',shard,'ACQUIRED',len(manifest),'FAILURES',len(failures),'BYTES',sum(x['bytes'] for x in manifest))
+          assert len(manifest)>=95, f'Too many failures: {len(failures)}'
+          # adaptive Drive-safe bundles, target <=75 MB raw payload per zip
+          groups=[]; cur=[]; total=0; limit=75_000_000
+          for m in manifest:
+            if cur and total+m['bytes']>limit:
+              groups.append(cur); cur=[]; total=0
+            cur.append(m); total+=m['bytes']
+          if cur: groups.append(cur)
+          for j,g in enumerate(groups,1):
+            out=pathlib.Path('out')/f'ngx-tranche-001-shard-{shard:02d}-bundle-{j:02d}.zip'
+            with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=5) as z:
+              for m in g: z.write(pathlib.Path('corpus',m['filename']),m['filename'])
+              z.writestr('BUNDLE_MANIFEST.json',json.dumps(g,ensure_ascii=False,indent=2))
+            print('BUNDLE',out.name,'DOCS',len(g),'SIZE',out.stat().st_size)
+            assert out.stat().st_size<95_000_000
+          PY
+        env:
+          SHARD: ${{ matrix.shard }}
+
+      - name: Upload shard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx-tranche-001-shard-${{ matrix.shard }}
+          path: out
+          retention-days: 1
+          compression-level: 0
