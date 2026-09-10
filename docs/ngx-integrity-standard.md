@@ -1,0 +1,1 @@
+Every acquired primary filing should retain source URL, NGX record ID, issuer/ticker, filing category, source date, inferred reporting year, SHA-256 hash, byte size and local filename in the manifest. Human-readable Drive filenames should not depend on the hash.
