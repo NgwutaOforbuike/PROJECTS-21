@@ -1,0 +1,1 @@
+Individual-file migration rule: extract temporary transfer archives; determine issuer and reporting year from manifest; route each PDF into the issuer vault; preserve original PDF bytes; use human-readable filenames; retain SHA-256 and source URL in manifests; verify destination count before deleting or archiving transfer ZIPs.
