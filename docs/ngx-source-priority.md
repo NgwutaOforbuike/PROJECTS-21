@@ -1,0 +1,1 @@
+Source priority: NGX primary filing > issuer investor-relations copy > SEC Nigeria/FCCPC/CBN/FMDQ/other regulator as applicable > court/official gazette/public authority > reputable secondary source. Do not replace an unavailable primary filing with commentary without marking the substitution.
