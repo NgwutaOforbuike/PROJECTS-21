@@ -1,4 +1,4 @@
-name: NGX Filings Tranche 002
+name: NGX Filings Tranche 003
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
           mkdir -p corpus out
           python - <<'PY'
           import requests,urllib.parse,json,pathlib,hashlib,time,re,os,zipfile
-          shard=int(os.environ['SHARD']); base_pos=1000
+          shard=int(os.environ['SHARD']); base_pos=3000
           start=base_pos+shard*200; stop=min(start+200,26910)
           expected=stop-start
           s=requests.Session(); s.headers.update({'Accept':'application/json;odata=verbose','User-Agent':'GlobalWealthAI/1.0 public filing archive'})
@@ -78,7 +78,7 @@ jobs:
       - name: Upload shard artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ngx-tranche-002-shard-${{ matrix.shard }}
+          name: ngx-tranche-003-shard-${{ matrix.shard }}
           path: out
           retention-days: 1
           compression-level: 0
