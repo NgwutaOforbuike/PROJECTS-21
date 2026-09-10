@@ -1,0 +1,80 @@
+name: Nigeria NBS Macro Ingestion
+
+on:
+  push:
+    paths:
+      - ".github/workflows/nigeria-nbs-macro-ingest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Prepare workspace
+        run: mkdir -p downloads corpus/CPI corpus/GDP artifacts
+
+      - name: Download official NBS release packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1432|downloads/CPI_2026_07.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1431|downloads/CPI_2026_06.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1422|downloads/CPI_2026_05.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1406|downloads/CPI_2026_04.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1394|downloads/CPI_2026_03.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1372|downloads/CPI_2026_02.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/154/download/1353|downloads/CPI_2026_01.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/147/download/1433|downloads/GDP_2026_Q2.zip"
+            "https://microdata.nigerianstat.gov.ng/index.php/catalog/147/download/1408|downloads/GDP_2026_Q1.zip"
+          )
+          for item in "${urls[@]}"; do
+            url="${item%%|*}"; out="${item##*|}"
+            curl -fL --retry 4 --retry-delay 3 --connect-timeout 20 -A "Mozilla/5.0 GlobalWealthAI Research" "$url" -o "$out"
+            test -s "$out"
+            unzip -t "$out" >/dev/null
+          done
+
+      - name: Extract CPI and GDP packages
+        run: |
+          for z in downloads/CPI_*.zip; do d="corpus/CPI/$(basename "$z" .zip)"; mkdir -p "$d"; unzip -oq "$z" -d "$d"; done
+          for z in downloads/GDP_*.zip; do d="corpus/GDP/$(basename "$z" .zip)"; mkdir -p "$d"; unzip -oq "$z" -d "$d"; done
+
+      - name: Validate and hash extracted source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILES=$(find corpus -type f | wc -l)
+          PDFS=$(find corpus -type f -iname '*.pdf' | wc -l)
+          SHEETS=$(find corpus -type f \( -iname '*.xlsx' -o -iname '*.xls' -o -iname '*.csv' \) | wc -l)
+          echo "Extracted source files: $FILES; PDFs: $PDFS; spreadsheets: $SHEETS"
+          test "$PDFS" -ge 9
+          test "$SHEETS" -ge 9
+          find corpus -type f -print0 | sort -z | xargs -0 sha256sum > artifacts/SHA256SUMS.txt
+          {
+            echo 'corpus=Nigeria NBS macro releases tranche 3'
+            echo 'publisher=National Bureau of Statistics Nigeria'
+            echo 'coverage=CPI January-July 2026; GDP Q1-Q2 2026'
+            echo "source_files=$FILES"
+            echo "pdf_reports=$PDFS"
+            echo "spreadsheets=$SHEETS"
+            echo "acquisition_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/ACQUISITION_MANIFEST.txt
+
+      - name: Package Drive-safe corpus
+        run: |
+          zip -qr artifacts/nigeria-nbs-macro-tranche-03.zip corpus artifacts/SHA256SUMS.txt artifacts/ACQUISITION_MANIFEST.txt
+          ls -lh artifacts/nigeria-nbs-macro-tranche-03.zip
+          test $(stat -c%s artifacts/nigeria-nbs-macro-tranche-03.zip) -lt 100000000
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nigeria-nbs-macro-tranche-03
+          path: artifacts/nigeria-nbs-macro-tranche-03.zip
+          retention-days: 1
+          compression-level: 0
