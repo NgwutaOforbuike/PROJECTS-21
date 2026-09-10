@@ -70,21 +70,18 @@ class RiskGovernor:
         max_loss = portfolio.equity_usd * self.mandate.max_risk_per_trade_pct / 100
         stop_pct = max(1.0, min(5.0, state.volatility_pct * 0.55))
         stop_distance = state.price * stop_pct / 100
+        entry_low = state.price * 0.9975
+        entry_high = state.price * 1.0025
 
-        # Costs are included in the planned loss budget instead of being treated
-        # as performance-only noise. This keeps adverse fills/fees from silently
-        # pushing planned loss above the 0.5% mandate.
         cost_per_unit = state.price * estimated_roundtrip_cost_pct / 100
         loss_per_unit = stop_distance + cost_per_unit
         risk_quantity = max_loss / loss_per_unit if loss_per_unit else 0.0
 
-        # Leverage is off: never size a BUY above cash available, even when the
-        # stop-risk formula would allow a larger notional.
-        cash_quantity = portfolio.cash_usd / state.price if state.price else 0.0
+        # Leverage is off: use the top of the permitted entry band so even an
+        # adverse planned entry cannot push BUY notional above available cash.
+        cash_quantity = portfolio.cash_usd / entry_high if entry_high else 0.0
         quantity = min(risk_quantity, cash_quantity)
 
-        entry_low = state.price * 0.9975
-        entry_high = state.price * 1.0025
         target_return = max(self.mandate.min_modelled_return_pct, state.expected_return_pct or 0)
         target = state.price * (1 + target_return / 100)
         planned_loss = quantity * loss_per_unit
@@ -107,7 +104,7 @@ class RiskGovernor:
             confidence=confidence,
             rationale=[
                 "Position size includes estimated round-trip trading costs in the loss budget.",
-                "BUY notional is capped by cash available; leverage remains disabled.",
+                "BUY notional is capped at the top of the entry band by cash available; leverage remains disabled.",
             ],
             exit_rules=[
                 "Exit immediately if stop-loss/invalidation is reached.",
