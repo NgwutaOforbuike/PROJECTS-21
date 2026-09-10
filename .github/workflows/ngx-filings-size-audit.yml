@@ -1,0 +1,74 @@
+name: NGX Filings Size Audit
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ngx-filings-size-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Audit content sizes from public NGX filing index
+        run: |
+          python - <<'PY'
+          import requests,urllib.parse,json,concurrent.futures,statistics,collections,random
+          s=requests.Session(); s.headers.update({'Accept':'application/json;odata=verbose','User-Agent':'GlobalWealthAI/1.0 research archive'})
+          base="https://doclib.ngxgroup.com/_api/web/lists/getByTitle('XFinancial_News')/items/"
+          params={'$select':'ID,URL','$orderby':'ID asc','$top':'5000'}
+          url=base+'?'+urllib.parse.urlencode(params,quote_via=urllib.parse.quote)
+          urls=[]; seen=set()
+          while url:
+            r=s.get(url,timeout=90); r.raise_for_status(); d=r.json()['d']
+            for x in d.get('results',[]):
+              u=(x.get('URL') or {}).get('Url') if isinstance(x.get('URL'),dict) else None
+              if u and u not in seen: seen.add(u); urls.append(u)
+            url=d.get('__next')
+          print('unique urls',len(urls))
+          # deterministic sample spanning archive
+          sample=[]
+          step=max(1,len(urls)//1200)
+          for i in range(0,len(urls),step): sample.append(urls[i])
+          sample=sample[:1500]
+          def probe(u):
+            try:
+              r=requests.head(u,allow_redirects=True,timeout=30,headers={'User-Agent':'GlobalWealthAI/1.0 research archive'})
+              n=int(r.headers.get('content-length') or 0)
+              if not n or r.status_code>=400:
+                r=requests.get(u,stream=True,timeout=30,headers={'User-Agent':'GlobalWealthAI/1.0 research archive','Range':'bytes=0-0'})
+                n=int(r.headers.get('content-range','/0').split('/')[-1] or r.headers.get('content-length') or 0)
+              return r.status_code,n,r.headers.get('content-type',''),u
+            except Exception as e: return 0,0,str(e),u
+          out=[]
+          with concurrent.futures.ThreadPoolExecutor(max_workers=30) as ex:
+            for i,x in enumerate(ex.map(probe,sample),1):
+              out.append(x)
+              if i%100==0: print('probed',i)
+          sizes=[n for st,n,ct,u in out if st and st<400 and n>0]
+          summary={
+            'unique_urls':len(urls),'sampled':len(sample),'successful_size_probes':len(sizes),
+            'median_bytes':int(statistics.median(sizes)) if sizes else None,
+            'mean_bytes':int(statistics.mean(sizes)) if sizes else None,
+            'p90_bytes':int(sorted(sizes)[int(.9*(len(sizes)-1))]) if sizes else None,
+            'p95_bytes':int(sorted(sizes)[int(.95*(len(sizes)-1))]) if sizes else None,
+            'p99_bytes':int(sorted(sizes)[int(.99*(len(sizes)-1))]) if sizes else None,
+            'max_bytes':max(sizes) if sizes else None,
+            'estimated_total_bytes_from_mean':int(statistics.mean(sizes)*len(urls)) if sizes else None,
+            'status_counts':collections.Counter(st for st,n,ct,u in out).most_common(),
+            'content_types':collections.Counter(ct.split(';')[0] for st,n,ct,u in out).most_common(20),
+          }
+          print(json.dumps(summary))
+          open('ngx_size_audit.json','w').write(json.dumps({'summary':summary,'sample':out},indent=2))
+          PY
+
+      - name: Upload size audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx-filings-size-audit
+          path: ngx_size_audit.json
+          retention-days: 1
