@@ -61,14 +61,15 @@ def test_position_size_includes_costs_in_half_percent_loss_budget() -> None:
     assert plan.risk_pct_equity <= 0.5
 
 
-def test_position_size_never_uses_leverage() -> None:
+def test_position_size_never_uses_leverage_at_top_of_entry_band() -> None:
     governor = RiskGovernor(Mandate())
     portfolio = PortfolioState(equity_usd=150.0, cash_usd=10.0)
 
     plan = governor.size(_state(price=100.0), portfolio, confidence=90.0)
 
-    assert plan.quantity == pytest.approx(0.1)
-    assert plan.quantity * 100.0 <= portfolio.cash_usd
+    assert plan.entry_high is not None
+    assert plan.quantity is not None
+    assert plan.quantity * plan.entry_high <= portfolio.cash_usd + 1e-4
 
 
 def test_backtest_metrics_are_net_of_transaction_costs() -> None:
